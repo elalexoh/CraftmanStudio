@@ -357,18 +357,18 @@ export class PanoramicEngine {
     }
 
     if (rulerType === 'orthogonal') {
-      if (anchor && this.sphereMesh) {
+      if (anchor) {
         const anchor3D = pixelToSphere(anchor.x, anchor.y);
         const anchorNDC = anchor3D.clone().project(this.camera);
 
         // 1. Screen Horizontal guide line (fixed y = anchorNDC.y)
         const ptsH: THREE.Vector3[] = [];
-        for (let i = 0; i <= 32; i++) {
-          const ndcX = -1 + (i / 32) * 2;
-          this.raycaster.setFromCamera(new THREE.Vector2(ndcX, anchorNDC.y), this.camera);
-          const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
-          if (intersects.length > 0) {
-            ptsH.push(intersects[0].point.clone().multiplyScalar(0.99));
+        for (let i = 0; i <= 24; i++) {
+          const ndcX = -1 + (i / 24) * 2;
+          const dir = new THREE.Vector3(ndcX, anchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+          const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
+          if (hit) {
+            ptsH.push(hit.point);
           }
         }
         if (ptsH.length > 1) {
@@ -380,12 +380,12 @@ export class PanoramicEngine {
 
         // 2. Screen Vertical guide line (fixed x = anchorNDC.x)
         const ptsV: THREE.Vector3[] = [];
-        for (let i = 0; i <= 32; i++) {
-          const ndcY = -1 + (i / 32) * 2;
-          this.raycaster.setFromCamera(new THREE.Vector2(anchorNDC.x, ndcY), this.camera);
-          const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
-          if (intersects.length > 0) {
-            ptsV.push(intersects[0].point.clone().multiplyScalar(0.99));
+        for (let i = 0; i <= 24; i++) {
+          const ndcY = -1 + (i / 24) * 2;
+          const dir = new THREE.Vector3(anchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+          const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
+          if (hit) {
+            ptsV.push(hit.point);
           }
         }
         if (ptsV.length > 1) {
@@ -668,26 +668,51 @@ export class PanoramicEngine {
     );
   }
 
+  private intersectRaySphere(origin: THREE.Vector3, direction: THREE.Vector3, radius: number): { point: THREE.Vector3; uv: THREE.Vector2 } | null {
+    // Analytical ray-sphere intersection with sphere at (0, 0, 0)
+    // Ray: P(t) = O + t*D. Sphere: |P|^2 = R^2
+    const b = origin.dot(direction);
+    const c = origin.lengthSq() - radius * radius;
+    const discriminant = b * b - c;
+
+    if (discriminant < 0) return null;
+
+    // Forward intersection distance
+    const t = -b + Math.sqrt(discriminant);
+    if (t < 0) return null;
+
+    const point = origin.clone().addScaledVector(direction, t);
+
+    // Calculate UV matching Three.js equirectangular SphereGeometry
+    const norm = point.clone().normalize();
+    let theta = Math.atan2(norm.z, -norm.x);
+    if (theta < 0) theta += Math.PI * 2;
+    const u = theta / (Math.PI * 2);
+
+    const phi = Math.acos(Math.max(-1, Math.min(1, norm.y)));
+    const v = 1 - phi / Math.PI;
+
+    return { point, uv: new THREE.Vector2(u, v) };
+  }
+
   public raycastFromClientCoords(clientX: number, clientY: number): RaycastResult | null {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-    if (!this.sphereMesh) return null;
-    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-    const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
+    // Ultra-fast analytical camera ray unproject
+    const dir = new THREE.Vector3(x, y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+    const hit = this.intersectRaySphere(this.camera.position, dir, 50);
 
-    if (intersects.length > 0 && intersects[0].uv) {
-      const hit = intersects[0];
-      const uv = hit.uv!;
+    if (hit) {
       const canvasWidth = this.masterCanvas ? this.masterCanvas.width : 4096;
       const canvasHeight = this.masterCanvas ? this.masterCanvas.height : 2048;
 
-      const pixelX = Math.floor(uv.x * canvasWidth);
-      const pixelY = Math.floor((1 - uv.y) * canvasHeight);
+      const pixelX = Math.floor(hit.uv.x * canvasWidth);
+      const pixelY = Math.floor((1 - hit.uv.y) * canvasHeight);
 
       return {
-        uv,
+        uv: hit.uv,
         point: hit.point,
         pixelX: Math.max(0, Math.min(canvasWidth - 1, pixelX)),
         pixelY: Math.max(0, Math.min(canvasHeight - 1, pixelY))
@@ -702,8 +727,6 @@ export class PanoramicEngine {
     anchorPixel: { x: number; y: number },
     currentLockedAxis: 'x' | 'y' | null
   ): { pixelX: number; pixelY: number; lockedAxis: 'x' | 'y' } | null {
-    if (!this.sphereMesh) return null;
-
     const canvasWidth = this.masterCanvas ? this.masterCanvas.width : 4096;
     const canvasHeight = this.masterCanvas ? this.masterCanvas.height : 2048;
 
@@ -740,20 +763,16 @@ export class PanoramicEngine {
       }
     }
 
-    // 4. Lock screen coordinate:
-    // If horizontal (axis === 'x'), lock screen Y to anchorNDC.y
-    // If vertical (axis === 'y'), lock screen X to anchorNDC.x
-    const targetNDC = new THREE.Vector2(
-      axis === 'x' ? currNDCX : anchorNDC.x,
-      axis === 'y' ? currNDCY : anchorNDC.y
-    );
+    // 4. Lock screen coordinate
+    const targetNDCX = axis === 'x' ? currNDCX : anchorNDC.x;
+    const targetNDCY = axis === 'y' ? currNDCY : anchorNDC.y;
 
-    this.raycaster.setFromCamera(targetNDC, this.camera);
-    const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
-    if (intersects.length > 0 && intersects[0].uv) {
-      const uv = intersects[0].uv!;
-      const px = Math.floor(uv.x * canvasWidth);
-      const py = Math.floor((1 - uv.y) * canvasHeight);
+    const dir = new THREE.Vector3(targetNDCX, targetNDCY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+    const hit = this.intersectRaySphere(this.camera.position, dir, 50);
+
+    if (hit) {
+      const px = Math.floor(hit.uv.x * canvasWidth);
+      const py = Math.floor((1 - hit.uv.y) * canvasHeight);
 
       return {
         pixelX: Math.max(0, Math.min(canvasWidth - 1, px)),
