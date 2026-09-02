@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { usePainting } from '../composables/usePainting';
 import { useRulers } from '../composables/useRulers';
-import { useSelection } from '../composables/useSelection';
 import { useI18n } from '../composables/useI18n';
-import type { ToolType, RulerType } from '../types/painting';
 import ColorPickerWheel from './ColorPickerWheel.vue';
 import {
   Pen,
@@ -15,28 +12,16 @@ import {
   Ruler,
   Minus,
   Plus,
-  ChevronDown,
   FlipHorizontal,
-  FlipVertical,
-  Globe,
-  Check
+  FlipVertical
 } from 'lucide-vue-next';
 
-const { currentTool, penSize, setTool, setPenSize, penColor, flipHorizontal, flipVertical } = usePainting();
-const { activeRuler, setRuler, isSphericalCurvatureEnabled, toggleSphericalCurvature } = useRulers();
-const { hasSelection, deselect } = useSelection();
+const { currentTool, penSize, setTool, setPenSize, flipHorizontal, flipVertical } = usePainting();
+const { activeRuler, setRuler } = useRulers();
 const { t } = useI18n();
-
-const showMobileColorPopup = ref(false);
-const showRulerMenu = ref(false);
 
 function adjustSize(delta: number) {
   setPenSize(penSize.value + delta);
-}
-
-function selectRuler(ruler: RulerType) {
-  setRuler(ruler);
-  showRulerMenu.value = false;
 }
 </script>
 
@@ -103,7 +88,7 @@ function selectRuler(ruler: RulerType) {
       <button
         class="tool-btn"
         :class="{ active: activeRuler === 'orthogonal' }"
-        :title="activeRuler === 'orthogonal' ? 'Regla Ortogonal: Activa (H / V Auto)' : 'Activar Regla Ortogonal (H / V Auto)'"
+        :title="activeRuler === 'orthogonal' ? 'Regla Ortogonal: Activa (H / V)' : 'Activar Regla Ortogonal (H / V)'"
         @click="setRuler(activeRuler === 'orthogonal' ? 'none' : 'orthogonal')"
       >
         <Ruler :size="16" />
@@ -111,7 +96,7 @@ function selectRuler(ruler: RulerType) {
       </button>
     </div>
 
-    <!-- 3. Flip Transformations -->
+    <!-- 2. Flip Transformations -->
     <div class="flip-actions-group">
       <button
         class="flip-btn"
@@ -133,7 +118,7 @@ function selectRuler(ruler: RulerType) {
 
     <div class="divider"></div>
 
-    <!-- 4. Pen Size Slider & Stepper -->
+    <!-- 3. Pen Size Slider & Stepper -->
     <div class="size-control-group">
       <div class="size-header">
         <span class="size-label">{{ t('thickness') }}</span>
@@ -170,7 +155,7 @@ function selectRuler(ruler: RulerType) {
 
     <div class="divider"></div>
 
-    <!-- 5. Color Picker Wheel -->
+    <!-- 4. Color Picker Wheel -->
     <div class="color-picker-section">
       <ColorPickerWheel />
     </div>
@@ -234,102 +219,7 @@ function selectRuler(ruler: RulerType) {
   }
 }
 
-.ruler-dropdown-wrap {
-  position: relative;
-  width: 100%;
-
-  .ruler-btn {
-    .arrow-icon {
-      margin-left: auto;
-      opacity: 0.7;
-    }
-  }
-
-  .ruler-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: -96px; // Align to sidebar width
-    width: 190px;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-    padding: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    z-index: 120;
-
-    .ruler-menu-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding: 6px 8px;
-      font-size: 11px;
-      font-weight: 500;
-      color: #334155;
-      background: transparent;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      text-align: left;
-      transition: all 0.15s ease;
-
-      &:hover {
-        background: #f1f5f9;
-        color: #0f172a;
-      }
-
-      &.selected {
-        background: #eff6ff;
-        color: #2563eb;
-        font-weight: 700;
-      }
-
-      .check-icon {
-        color: #2563eb;
-      }
-    }
-  }
-}
-
-/* 2. Curvature Toggle */
-.curvature-toggle-wrap {
-  width: 100%;
-}
-
-.curvature-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 5px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-sizing: border-box;
-
-  &:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-    color: #334155;
-  }
-
-  &.is-active {
-    background: #eff6ff;
-    border-color: #93c5fd;
-    color: #1d4ed8;
-  }
-}
-
-/* 3. Flip Transformation Actions */
+/* 2. Flip Transformation Actions */
 .flip-actions-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -365,14 +255,14 @@ function selectRuler(ruler: RulerType) {
   }
 }
 
-/* 4. Divider */
+/* 3. Divider */
 .divider {
   height: 1px;
   background: #e2e8f0;
   margin: 1px 0;
 }
 
-/* 5. Size Control Group */
+/* 4. Size Control Group */
 .size-control-group {
   display: flex;
   flex-direction: column;
@@ -453,7 +343,7 @@ function selectRuler(ruler: RulerType) {
   cursor: pointer;
 }
 
-/* 6. Color Picker Section */
+/* 5. Color Picker Section */
 .color-picker-section {
   display: flex;
   flex-direction: column;

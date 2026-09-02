@@ -293,10 +293,7 @@ export class PanoramicEngine {
 
   public updateRulerGuides(
     rulerType: string,
-    anchor?: { x: number; y: number } | null,
-    center?: { x: number; y: number },
-    previewEnd?: { x: number; y: number } | null,
-    isSphericalCurvatureEnabled: boolean = true
+    anchor?: { x: number; y: number } | null
   ) {
     // Clear previous ruler objects and dispose geometries
     while (this.rulerGuideGroup.children.length > 0) {
@@ -307,13 +304,12 @@ export class PanoramicEngine {
       this.rulerGuideGroup.remove(obj);
     }
 
-    if (rulerType === 'none' || !this.masterCanvas) {
+    if (rulerType !== 'orthogonal' || !this.masterCanvas || !anchor) {
       return;
     }
 
     const w = this.masterCanvas.width;
     const h = this.masterCanvas.height;
-    const r = 49.5; // spherical projection distance (inside 50 radius sphere)
 
     const pixelToSphere = (px: number, py: number): THREE.Vector3 => {
       const u = ((px % w) + w) % w / w;
@@ -321,6 +317,7 @@ export class PanoramicEngine {
       const phi = (1 - v) * Math.PI;
       const theta = u * Math.PI * 2;
 
+      const r = 49.5;
       const x = -r * Math.cos(theta) * Math.sin(phi);
       const y = r * Math.cos(phi);
       const z = r * Math.sin(theta) * Math.sin(phi);
@@ -328,153 +325,41 @@ export class PanoramicEngine {
     };
 
     const lineMaterial = this.rulerLineMaterial;
+    const anchor3D = pixelToSphere(anchor.x, anchor.y);
+    const anchorNDC = anchor3D.clone().project(this.camera);
 
-    if (rulerType === 'two-point') {
-      if (anchor && previewEnd) {
-        let adjustedX2 = previewEnd.x;
-        const deltaX = adjustedX2 - anchor.x;
-        if (deltaX < -w / 2) {
-          adjustedX2 += w;
-        } else if (deltaX > w / 2) {
-          adjustedX2 -= w;
-        }
-
-        const pts: THREE.Vector3[] = [];
-        const segments = 32;
-        for (let i = 0; i <= segments; i++) {
-          const t = i / segments;
-          const curX = anchor.x + (adjustedX2 - anchor.x) * t;
-          const curY = anchor.y + (previewEnd.y - anchor.y) * t;
-          pts.push(pixelToSphere(curX, curY));
-        }
-
-        const geom = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.Line(geom, lineMaterial);
-        line.renderOrder = 20;
-        this.rulerGuideGroup.add(line);
+    // 1. Screen Horizontal guide line (fixed y = anchorNDC.y)
+    const ptsH: THREE.Vector3[] = [];
+    for (let i = 0; i <= 24; i++) {
+      const ndcX = -1 + (i / 24) * 2;
+      const dir = new THREE.Vector3(ndcX, anchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+      const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
+      if (hit) {
+        ptsH.push(hit.point);
       }
-      return;
+    }
+    if (ptsH.length > 1) {
+      const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
+      const lineH = new THREE.Line(geomH, lineMaterial);
+      lineH.renderOrder = 20;
+      this.rulerGuideGroup.add(lineH);
     }
 
-    if (rulerType === 'orthogonal') {
-      if (anchor) {
-        const anchor3D = pixelToSphere(anchor.x, anchor.y);
-        const anchorNDC = anchor3D.clone().project(this.camera);
-
-        // 1. Screen Horizontal guide line (fixed y = anchorNDC.y)
-        const ptsH: THREE.Vector3[] = [];
-        for (let i = 0; i <= 24; i++) {
-          const ndcX = -1 + (i / 24) * 2;
-          const dir = new THREE.Vector3(ndcX, anchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-          const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
-          if (hit) {
-            ptsH.push(hit.point);
-          }
-        }
-        if (ptsH.length > 1) {
-          const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
-          const lineH = new THREE.Line(geomH, lineMaterial);
-          lineH.renderOrder = 20;
-          this.rulerGuideGroup.add(lineH);
-        }
-
-        // 2. Screen Vertical guide line (fixed x = anchorNDC.x)
-        const ptsV: THREE.Vector3[] = [];
-        for (let i = 0; i <= 24; i++) {
-          const ndcY = -1 + (i / 24) * 2;
-          const dir = new THREE.Vector3(anchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-          const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
-          if (hit) {
-            ptsV.push(hit.point);
-          }
-        }
-        if (ptsV.length > 1) {
-          const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
-          const lineV = new THREE.Line(geomV, lineMaterial);
-          lineV.renderOrder = 20;
-          this.rulerGuideGroup.add(lineV);
-        }
+    // 2. Screen Vertical guide line (fixed x = anchorNDC.x)
+    const ptsV: THREE.Vector3[] = [];
+    for (let i = 0; i <= 24; i++) {
+      const ndcY = -1 + (i / 24) * 2;
+      const dir = new THREE.Vector3(anchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+      const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
+      if (hit) {
+        ptsV.push(hit.point);
       }
-      return;
     }
-
-    if (rulerType === 'vertical') {
-      // If stroke anchor is active, draw primary active meridian line
-      if (anchor) {
-        const pts: THREE.Vector3[] = [];
-        const segments = 48;
-        for (let i = 0; i <= segments; i++) {
-          const y = (i / segments) * h;
-          pts.push(pixelToSphere(anchor.x, y));
-        }
-        const geom = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.Line(geom, lineMaterial);
-        line.renderOrder = 20;
-        this.rulerGuideGroup.add(line);
-      } else {
-        // Draw 12 vertical meridian guide lines around the sphere (every 30 degrees)
-        for (let m = 0; m < 12; m++) {
-          const x = (m / 12) * w;
-          const pts: THREE.Vector3[] = [];
-          const segments = 32;
-          for (let i = 0; i <= segments; i++) {
-            const y = (i / segments) * h;
-            pts.push(pixelToSphere(x, y));
-          }
-          const geom = new THREE.BufferGeometry().setFromPoints(pts);
-          const line = new THREE.Line(geom, lineMaterial);
-          line.renderOrder = 20;
-          this.rulerGuideGroup.add(line);
-        }
-      }
-    } else if (rulerType === 'horizontal') {
-      // If stroke anchor is active, draw primary active latitude circle
-      if (anchor) {
-        const pts: THREE.Vector3[] = [];
-        const segments = 64;
-        for (let i = 0; i <= segments; i++) {
-          const x = (i / segments) * w;
-          pts.push(pixelToSphere(x, anchor.y));
-        }
-        const geom = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.LineLoop(geom, lineMaterial);
-        line.renderOrder = 20;
-        this.rulerGuideGroup.add(line);
-      } else {
-        // Draw 5 horizontal latitude circles (-60, -30, 0 horizon, +30, +60 degrees)
-        const latitudes = [0.15, 0.32, 0.5, 0.68, 0.85];
-        for (const latRatio of latitudes) {
-          const y = latRatio * h;
-          const pts: THREE.Vector3[] = [];
-          const segments = 64;
-          for (let i = 0; i <= segments; i++) {
-            const x = (i / segments) * w;
-            pts.push(pixelToSphere(x, y));
-          }
-          const geom = new THREE.BufferGeometry().setFromPoints(pts);
-          const line = new THREE.LineLoop(geom, lineMaterial);
-          line.renderOrder = 20;
-          this.rulerGuideGroup.add(line);
-        }
-      }
-    } else if (rulerType === 'radial' && center) {
-      // 12 radial perspective rays
-      const rays = 12;
-      for (let i = 0; i < rays; i++) {
-        const angle = (i / rays) * Math.PI * 2;
-        const pts: THREE.Vector3[] = [];
-        const segments = 32;
-        for (let s = 0; s <= segments; s++) {
-          const dist = (s / segments) * (w * 0.7);
-          const curX = center.x + Math.cos(angle) * dist;
-          const curY = center.y + Math.sin(angle) * dist;
-          pts.push(pixelToSphere(curX, curY));
-        }
-        const geom = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.Line(geom, lineMaterial);
-        line.renderOrder = 20;
-        this.rulerGuideGroup.add(line);
-      }
+    if (ptsV.length > 1) {
+      const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
+      const lineV = new THREE.Line(geomV, lineMaterial);
+      lineV.renderOrder = 20;
+      this.rulerGuideGroup.add(lineV);
     }
   }
 

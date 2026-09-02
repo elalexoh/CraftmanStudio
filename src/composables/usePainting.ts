@@ -59,7 +59,7 @@ let lastMidY = 0;
 export function usePainting() {
   const { layers, activeLayer, recomposeMaster, recomposeMasterImmediate, masterCanvas, masterCtx, canvasWidth, canvasHeight } = useLayers();
   const { selectionPoints, hasSelection, startLasso, continueLasso, endLasso, setSelectionState, applySelectionClip, clearInsideSelection } = useSelection();
-  const { activeRuler, strokeAnchor, linePreviewEnd, isSphericalCurvatureEnabled, setStrokeAnchor, resetStrokeAnchor, setLinePreviewEnd, snapPoint } = useRulers();
+  const { activeRuler, strokeAnchor, setStrokeAnchor, resetStrokeAnchor, snapPoint } = useRulers();
 
   const currentSize = computed(() => toolSizes.value[currentTool.value] || 3);
 
@@ -270,12 +270,6 @@ export function usePainting() {
     lastMidX = pixelX;
     lastMidY = pixelY;
 
-    // For Two-Point ruler, start live line preview and don't paint dot yet
-    if (activeRuler.value === 'two-point') {
-      setLinePreviewEnd({ x: pixelX, y: pixelY });
-      return;
-    }
-
     const width = layer.canvas.width;
     const height = layer.canvas.height;
     const ctx = layer.ctx;
@@ -322,12 +316,6 @@ export function usePainting() {
     const rawDeltaX = pixelX - lastX;
     const rawDeltaY = pixelY - lastY;
     if (Math.abs(rawDeltaX) < 0.6 && Math.abs(rawDeltaY) < 0.6) {
-      return;
-    }
-
-    // For Two-Point ruler, only update live line preview endpoint
-    if (activeRuler.value === 'two-point') {
-      setLinePreviewEnd({ x: pixelX, y: pixelY });
       return;
     }
 
@@ -460,43 +448,6 @@ export function usePainting() {
     isPainting = false;
 
     const layer = activeLayer.value;
-
-    // For Two-Point ruler, draw the final straight line between anchor and endpoint
-    if (activeRuler.value === 'two-point' && layer && layer.visible) {
-      const anchor = strokeAnchor.value;
-      const previewEnd = linePreviewEnd.value;
-      if (anchor && previewEnd) {
-        const width = layer.canvas.width;
-        const height = layer.canvas.height;
-        const ctx = layer.ctx;
-        ctx.save();
-        if (hasSelection.value) {
-          applySelectionClip(ctx, width, height);
-        }
-        if (currentTool.value === 'eraser') {
-          ctx.globalCompositeOperation = 'destination-out';
-          ctx.strokeStyle = 'rgba(0,0,0,1)';
-        } else {
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = penColor.value;
-        }
-        ctx.lineWidth = currentSize.value;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        drawStraightLineWithWrap(
-          ctx,
-          anchor.x,
-          anchor.y,
-          previewEnd.x,
-          previewEnd.y,
-          width,
-          height,
-          !isSphericalCurvatureEnabled.value
-        );
-        ctx.restore();
-      }
-    }
 
     if (layer && beforeImageData) {
       try {
