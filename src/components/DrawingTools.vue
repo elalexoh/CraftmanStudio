@@ -89,7 +89,7 @@ function selectRuler(ruler: RulerType) {
           @click="showRulerMenu = !showRulerMenu"
         >
           <Ruler :size="18" />
-          <span>{{ activeRuler === 'none' ? (t('ruler') || 'Regla') : activeRuler === 'vertical' ? 'Vertical' : activeRuler === 'horizontal' ? 'Horizontal' : 'Radial' }}</span>
+          <span>{{ activeRuler === 'none' ? (t('ruler') || 'Regla') : activeRuler === 'vertical' ? 'Vertical' : activeRuler === 'horizontal' ? 'Horizontal' : activeRuler === 'radial' ? 'Radial' : 'Línea 2P' }}</span>
           <ChevronDown :size="10" class="arrow-icon" />
         </button>
 
@@ -100,6 +100,13 @@ function selectRuler(ruler: RulerType) {
             @click="selectRuler('none')"
           >
             <span>Desactivada</span>
+          </button>
+          <button
+            class="ruler-menu-item"
+            :class="{ selected: activeRuler === 'two-point' }"
+            @click="selectRuler('two-point')"
+          >
+            <span>📏 Línea Recta (2 Puntos)</span>
           </button>
           <button
             class="ruler-menu-item"

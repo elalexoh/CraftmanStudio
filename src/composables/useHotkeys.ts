@@ -257,7 +257,15 @@ export function useHotkeys() {
     }
 
     if (matchesBinding('toolRuler', eventKeyStr, rawKey)) {
-      const nextRuler = activeRuler.value === 'none' ? 'vertical' : activeRuler.value === 'vertical' ? 'horizontal' : activeRuler.value === 'horizontal' ? 'radial' : 'none';
+      const nextRuler = activeRuler.value === 'none'
+        ? 'two-point'
+        : activeRuler.value === 'two-point'
+        ? 'vertical'
+        : activeRuler.value === 'vertical'
+        ? 'horizontal'
+        : activeRuler.value === 'horizontal'
+        ? 'radial'
+        : 'none';
       setRuler(nextRuler);
       return;
     }

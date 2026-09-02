@@ -291,7 +291,12 @@ export class PanoramicEngine {
     depthWrite: false
   });
 
-  public updateRulerGuides(rulerType: string, anchor?: { x: number; y: number } | null, center?: { x: number; y: number }) {
+  public updateRulerGuides(
+    rulerType: string,
+    anchor?: { x: number; y: number } | null,
+    center?: { x: number; y: number },
+    previewEnd?: { x: number; y: number } | null
+  ) {
     // Clear previous ruler objects and dispose geometries
     while (this.rulerGuideGroup.children.length > 0) {
       const obj = this.rulerGuideGroup.children[0] as THREE.Line;
@@ -322,6 +327,33 @@ export class PanoramicEngine {
     };
 
     const lineMaterial = this.rulerLineMaterial;
+
+    if (rulerType === 'two-point') {
+      if (anchor && previewEnd) {
+        let adjustedX2 = previewEnd.x;
+        const deltaX = adjustedX2 - anchor.x;
+        if (deltaX < -w / 2) {
+          adjustedX2 += w;
+        } else if (deltaX > w / 2) {
+          adjustedX2 -= w;
+        }
+
+        const pts: THREE.Vector3[] = [];
+        const segments = 32;
+        for (let i = 0; i <= segments; i++) {
+          const t = i / segments;
+          const curX = anchor.x + (adjustedX2 - anchor.x) * t;
+          const curY = anchor.y + (previewEnd.y - anchor.y) * t;
+          pts.push(pixelToSphere(curX, curY));
+        }
+
+        const geom = new THREE.BufferGeometry().setFromPoints(pts);
+        const line = new THREE.Line(geom, lineMaterial);
+        line.renderOrder = 20;
+        this.rulerGuideGroup.add(line);
+      }
+      return;
+    }
 
     if (rulerType === 'vertical') {
       // If stroke anchor is active, draw primary active meridian line
