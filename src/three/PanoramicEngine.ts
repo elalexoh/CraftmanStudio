@@ -628,27 +628,31 @@ export class PanoramicEngine {
       r * Math.sin(theta) * Math.sin(phi)
     );
 
-    // 2. Project anchor to screen NDC coordinates
+    // 2. Project anchor to physical screen pixel coordinates
     const anchorNDC = anchor3D.clone().project(this.camera);
-
-    // 3. Current mouse position in screen NDC
     const rect = this.renderer.domElement.getBoundingClientRect();
-    const currNDCX = ((clientX - rect.left) / rect.width) * 2 - 1;
-    const currNDCY = -((clientY - rect.top) / rect.height) * 2 + 1;
+    const anchorScreenX = ((anchorNDC.x + 1) / 2) * rect.width + rect.left;
+    const anchorScreenY = ((-anchorNDC.y + 1) / 2) * rect.height + rect.top;
 
-    const deltaNDCX = currNDCX - anchorNDC.x;
-    const deltaNDCY = currNDCY - anchorNDC.y;
+    // 3. Delta in physical screen pixels (1:1 uniform aspect ratio)
+    const deltaPxX = clientX - anchorScreenX;
+    const deltaPxY = clientY - anchorScreenY;
 
     let axis = currentLockedAxis;
     if (!axis) {
-      if (Math.hypot(deltaNDCX * rect.width, deltaNDCY * rect.height) >= 3) {
-        axis = Math.abs(deltaNDCX) >= Math.abs(deltaNDCY) ? 'x' : 'y';
+      const dist = Math.hypot(deltaPxX, deltaPxY);
+      if (dist >= 6) {
+        // Perfect 1:1 symmetric 45-degree angle test
+        axis = Math.abs(deltaPxX) >= Math.abs(deltaPxY) ? 'x' : 'y';
       } else {
         return { pixelX: anchorPixel.x, pixelY: anchorPixel.y, lockedAxis: 'x' };
       }
     }
 
-    // 4. Lock screen coordinate
+    // 4. Lock target NDC coordinate
+    const currNDCX = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const currNDCY = -((clientY - rect.top) / rect.height) * 2 + 1;
+
     const targetNDCX = axis === 'x' ? currNDCX : anchorNDC.x;
     const targetNDCY = axis === 'y' ? currNDCY : anchorNDC.y;
 
