@@ -99,83 +99,15 @@ function selectRuler(ruler: RulerType) {
         <span>{{ t('lasso') || 'Lazo' }}</span>
       </button>
 
-      <!-- Ruler Dropdown Button -->
-      <div class="ruler-dropdown-wrap">
-        <button
-          class="tool-btn ruler-btn"
-          :class="{ active: activeRuler !== 'none' }"
-          :title="t('ruler') || 'Reglas Guía'"
-          @click="showRulerMenu = !showRulerMenu"
-        >
-          <Ruler :size="16" />
-          <span>{{ activeRuler === 'none' ? (t('ruler') || 'Regla') : activeRuler === 'orthogonal' ? 'Ortogonal' : activeRuler === 'two-point' ? 'Línea 2P' : activeRuler === 'vertical' ? 'Vertical' : activeRuler === 'horizontal' ? 'Horizontal' : 'Radial' }}</span>
-          <ChevronDown :size="11" class="arrow-icon" />
-        </button>
-
-        <!-- Ruler Popup Menu -->
-        <div v-if="showRulerMenu" class="ruler-menu">
-          <button
-            class="ruler-menu-item"
-            :class="{ selected: activeRuler === 'none' }"
-            @click="selectRuler('none')"
-          >
-            <span>Desactivada</span>
-            <Check v-if="activeRuler === 'none'" :size="12" class="check-icon" />
-          </button>
-          <button
-            class="ruler-menu-item"
-            :class="{ selected: activeRuler === 'orthogonal' }"
-            @click="selectRuler('orthogonal')"
-          >
-            <span>➕ Regla Ortogonal (H / V Auto)</span>
-            <Check v-if="activeRuler === 'orthogonal'" :size="12" class="check-icon" />
-          </button>
-          <button
-            class="ruler-menu-item"
-            :class="{ selected: activeRuler === 'two-point' }"
-            @click="selectRuler('two-point')"
-          >
-            <span>📏 Línea Recta (2 Puntos)</span>
-            <Check v-if="activeRuler === 'two-point'" :size="12" class="check-icon" />
-          </button>
-          <button
-            class="ruler-menu-item"
-            :class="{ selected: activeRuler === 'vertical' }"
-            @click="selectRuler('vertical')"
-          >
-            <span>↕️ Regla Vertical (360°)</span>
-            <Check v-if="activeRuler === 'vertical'" :size="12" class="check-icon" />
-          </button>
-          <button
-            class="ruler-menu-item"
-            :class="{ selected: activeRuler === 'horizontal' }"
-            @click="selectRuler('horizontal')"
-          >
-            <span>↔️ Regla Horizontal (Latitud)</span>
-            <Check v-if="activeRuler === 'horizontal'" :size="12" class="check-icon" />
-          </button>
-          <button
-            class="ruler-menu-item"
-            :class="{ selected: activeRuler === 'radial' }"
-            @click="selectRuler('radial')"
-          >
-            <span>🎯 Regla Radial (Perspectiva)</span>
-            <Check v-if="activeRuler === 'radial'" :size="12" class="check-icon" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Ruler Curvature Toggle (Shown only when a ruler is active) -->
-    <div v-if="activeRuler !== 'none'" class="curvature-toggle-wrap">
+      <!-- Orthogonal Ruler Toggle Button -->
       <button
-        class="curvature-btn"
-        :class="{ 'is-active': isSphericalCurvatureEnabled }"
-        :title="isSphericalCurvatureEnabled ? 'Curvatura 360° Activa: Las reglas siguen la perspectiva esférica' : 'Modo Plano 2D: Líneas rectas sin deformación'"
-        @click="toggleSphericalCurvature()"
+        class="tool-btn"
+        :class="{ active: activeRuler === 'orthogonal' }"
+        :title="activeRuler === 'orthogonal' ? 'Regla Ortogonal: Activa (H / V Auto)' : 'Activar Regla Ortogonal (H / V Auto)'"
+        @click="setRuler(activeRuler === 'orthogonal' ? 'none' : 'orthogonal')"
       >
-        <Globe :size="13" />
-        <span>{{ isSphericalCurvatureEnabled ? 'Curvatura: ON' : 'Plano 2D: OFF' }}</span>
+        <Ruler :size="16" />
+        <span>{{ activeRuler === 'orthogonal' ? 'Ortogonal: ON' : 'Ortogonal' }}</span>
       </button>
     </div>
 
