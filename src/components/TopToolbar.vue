@@ -7,14 +7,13 @@ import { useProjectStorage } from '../composables/useProjectStorage';
 import { useI18n } from '../composables/useI18n';
 import { isHotkeysModalOpen } from '../composables/useHotkeys';
 import type { CanvasResolution, Language } from '../types/painting';
-import { Undo2, Redo2, HelpCircle, Eye, Grid, Download, Upload, Image as ImageIcon, Globe, Keyboard, Save } from 'lucide-vue-next';
+import { Undo2, Redo2, HelpCircle, Eye, Download, Upload, Keyboard, Save } from 'lucide-vue-next';
 
 const { canUndo, canRedo, undo, redo } = usePainting();
 const { setCanvasResolution } = useLayers();
 const {
   appMode,
   eyeHeight,
-  showGroundGrid,
   canvasResolution,
   isPreviewOpen,
   isHelpOpen,
@@ -22,11 +21,10 @@ const {
   setAppMode,
   setEyeHeight,
   adjustEyeHeight,
-  toggleGroundGrid,
   setResolution,
   toggleAutoSave
 } = useAppState();
-const { saveProjectToFile, loadProjectFromFile, exportPng } = useProjectStorage();
+const { saveProjectToFile, loadProjectFromFile } = useProjectStorage();
 const { currentLanguage, setLanguage, t } = useI18n();
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -138,8 +136,8 @@ async function onFileSelected(e: Event) {
           id="eyeSlider"
           type="range"
           min="0.5"
-          max="30"
-          step="0.1"
+          max="3.0"
+          step="0.05"
           :value="eyeHeight"
           class="slider-input"
           @input="setEyeHeight(parseFloat(($event.target as HTMLInputElement).value))"
@@ -149,32 +147,11 @@ async function onFileSelected(e: Event) {
           :title="t('raiseEye')"
           @click="adjustEyeHeight(0.1)"
         >+</button>
-        <input
-          id="eyeInput"
-          type="number"
-          min="0.5"
-          max="30"
-          step="0.1"
-          :value="eyeHeight"
-          class="num-input"
-          @input="setEyeHeight(parseFloat(($event.target as HTMLInputElement).value))"
-        />
-        <span class="unit">m</span>
+        <span class="value-badge">{{ eyeHeight.toFixed(2) }}m</span>
       </div>
-
-      <!-- Ground Grid Toggle -->
-      <label class="toggle-item">
-        <input
-          type="checkbox"
-          :checked="showGroundGrid"
-          @change="toggleGroundGrid(($event.target as HTMLInputElement).checked)"
-        />
-        <span>{{ t('groundGrid') }}</span>
-      </label>
 
       <!-- Language Selector -->
       <div class="control-item lang-selector">
-        <Globe :size="14" class="lang-icon" />
         <select
           :value="currentLanguage"
           class="select-input select-lang"
@@ -268,9 +245,74 @@ async function onFileSelected(e: Event) {
 }
 
 .app-branding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
   color: #1e293b;
   margin-right: 4px;
+
+  .app-name {
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+}
+
+.dev-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  .dev-tag {
+    font-weight: 700;
+    color: #6366f1;
+    font-size: 10px;
+  }
+
+  .dev-name {
+    color: #334155;
+  }
+
+  .dev-icon {
+    color: #94a3b8;
+    transition: transform 0.2s;
+  }
+
+  &:hover {
+    background: #e0e7ff;
+    border-color: #c7d2fe;
+    color: #3730a3;
+
+    .dev-icon {
+      color: #6366f1;
+      transform: translate(1px, -1px);
+    }
+  }
+}
+
+.btn-tutorial {
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+
+  .sparkle-icon {
+    color: #fbbf24;
+  }
+
+  &:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+  }
 }
 
 .mode-switcher-group {

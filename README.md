@@ -63,5 +63,17 @@ npm run build
 
 ---
 
+## 👨‍💻 Desarrollador
+Creado y desarrollado por **Frederick A. Gonzalez**.
+* 🌐 [👺 Portafolio Web](https://deeply-portfolio.netlify.app/)
+* 💼 Desarrollador Full-Stack, Arquitectura Web & 3D Interactivo.
+
+---
+
+## 🙏 Agradecimientos & Inspiración
+El módulo de dibujo panorámico 360° de Craftsman Studio está inspirado en la excelente herramienta web [**ぐるりペイント (Gururi Paint)**](https://tools.neco-sara.com/tools/gururi-paint/) creada por [neco-sara](https://tools.neco-sara.com/).
+
+---
+
 ## 📄 Licencia
 Este proyecto está bajo la Licencia MIT.

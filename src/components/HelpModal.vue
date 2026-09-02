@@ -115,6 +115,24 @@ const { t } = useI18n();
           <Smartphone :size="15" class="icon" />
           <span>{{ t('helpTouchPinch') }}</span>
         </div>
+
+        <div class="divider"></div>
+
+        <!-- Credits & Inspiration -->
+        <div class="credits-box">
+          <div class="credit-line">
+            <span>👺 Desarrollado por <strong>Frederick A. Gonzalez</strong></span>
+            <a
+              href="https://deeply-portfolio.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="link"
+            >Portafolio ↗</a>
+          </div>
+          <div class="credit-line text-muted">
+            <span>Inspirado en <a href="https://tools.neco-sara.com/tools/gururi-paint/" target="_blank" rel="noopener noreferrer" class="link">ぐるりペイント (Gururi Paint)</a> de neco-sara</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -196,5 +214,41 @@ const { t } = useI18n();
   height: 1px;
   background: #e2e8f0;
   margin: 4px 0;
+}
+
+.credits-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #334155;
+
+  .credit-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    &.text-muted {
+      color: #64748b;
+      font-size: 11px;
+    }
+  }
+
+  .link {
+    color: #2563eb;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: #1d4ed8;
+    }
+  }
 }
 </style>

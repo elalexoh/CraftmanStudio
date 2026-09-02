@@ -32,8 +32,12 @@ import { useHotkeys, isSpaceActive, isZActive } from './composables/useHotkeys';
 import { useRulers } from './composables/useRulers';
 import { useSelection } from './composables/useSelection';
 
+import FloatingBottomDock from './components/FloatingBottomDock.vue';
+import OnboardingModal from './components/OnboardingModal.vue';
+
 const viewportRef = ref<HTMLElement | null>(null);
 let engine: PanoramicEngine | null = null;
+const isOnboardingOpen = ref(false);
 
 const { activeRuler, strokeAnchor, radialCenter } = useRulers();
 const { selectionPoints, hasSelection, isDrawingLasso, isInverted } = useSelection();
@@ -112,6 +116,13 @@ onMounted(async () => {
   if (appMode.value === '360') {
     init360Engine();
   }
+
+  // Check if onboarding was already completed
+  try {
+    if (!localStorage.getItem('craftsman_onboarding_seen')) {
+      isOnboardingOpen.value = true;
+    }
+  } catch (e) {}
 
   // Subscribe to texture updates
   onCanvasUpdated(() => {
@@ -427,6 +438,12 @@ function onTouchEnd(e: TouchEvent) {
         </div>
       </div>
     </template>
+
+    <!-- Floating Bottom Dock (Grid Toggle, Guide, Developer Portfolio) -->
+    <FloatingBottomDock @open-guide="isOnboardingOpen = true" />
+
+    <!-- Interactive Quick Guide Modal -->
+    <OnboardingModal v-if="isOnboardingOpen" @close="isOnboardingOpen = false" />
   </div>
 </template>
 
