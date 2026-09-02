@@ -357,28 +357,43 @@ export class PanoramicEngine {
     }
 
     if (rulerType === 'orthogonal') {
-      if (anchor) {
-        // Draw vertical guide through anchor
-        const ptsV: THREE.Vector3[] = [];
-        for (let i = 0; i <= 48; i++) {
-          const y = (i / 48) * h;
-          ptsV.push(pixelToSphere(anchor.x, y));
-        }
-        const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
-        const lineV = new THREE.Line(geomV, lineMaterial);
-        lineV.renderOrder = 20;
-        this.rulerGuideGroup.add(lineV);
+      if (anchor && this.sphereMesh) {
+        const anchor3D = pixelToSphere(anchor.x, anchor.y);
+        const anchorNDC = anchor3D.clone().project(this.camera);
 
-        // Draw horizontal guide through anchor
+        // 1. Screen Horizontal guide line (fixed y = anchorNDC.y)
         const ptsH: THREE.Vector3[] = [];
-        for (let i = 0; i <= 64; i++) {
-          const x = (i / 64) * w;
-          ptsH.push(pixelToSphere(x, anchor.y));
+        for (let i = 0; i <= 32; i++) {
+          const ndcX = -1 + (i / 32) * 2;
+          this.raycaster.setFromCamera(new THREE.Vector2(ndcX, anchorNDC.y), this.camera);
+          const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
+          if (intersects.length > 0) {
+            ptsH.push(intersects[0].point.clone().multiplyScalar(0.99));
+          }
         }
-        const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
-        const lineH = new THREE.LineLoop(geomH, lineMaterial);
-        lineH.renderOrder = 20;
-        this.rulerGuideGroup.add(lineH);
+        if (ptsH.length > 1) {
+          const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
+          const lineH = new THREE.Line(geomH, lineMaterial);
+          lineH.renderOrder = 20;
+          this.rulerGuideGroup.add(lineH);
+        }
+
+        // 2. Screen Vertical guide line (fixed x = anchorNDC.x)
+        const ptsV: THREE.Vector3[] = [];
+        for (let i = 0; i <= 32; i++) {
+          const ndcY = -1 + (i / 32) * 2;
+          this.raycaster.setFromCamera(new THREE.Vector2(anchorNDC.x, ndcY), this.camera);
+          const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
+          if (intersects.length > 0) {
+            ptsV.push(intersects[0].point.clone().multiplyScalar(0.99));
+          }
+        }
+        if (ptsV.length > 1) {
+          const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
+          const lineV = new THREE.Line(geomV, lineMaterial);
+          lineV.renderOrder = 20;
+          this.rulerGuideGroup.add(lineV);
+        }
       }
       return;
     }
@@ -678,6 +693,75 @@ export class PanoramicEngine {
         pixelY: Math.max(0, Math.min(canvasHeight - 1, pixelY))
       };
     }
+    return null;
+  }
+
+  public snapRaycastToScreenOrthogonal(
+    clientX: number,
+    clientY: number,
+    anchorPixel: { x: number; y: number },
+    currentLockedAxis: 'x' | 'y' | null
+  ): { pixelX: number; pixelY: number; lockedAxis: 'x' | 'y' } | null {
+    if (!this.sphereMesh) return null;
+
+    const canvasWidth = this.masterCanvas ? this.masterCanvas.width : 4096;
+    const canvasHeight = this.masterCanvas ? this.masterCanvas.height : 2048;
+
+    // 1. Calculate 3D sphere point of anchor
+    const u = (((anchorPixel.x % canvasWidth) + canvasWidth) % canvasWidth) / canvasWidth;
+    const v = Math.max(0, Math.min(1, 1 - anchorPixel.y / canvasHeight));
+    const phi = (1 - v) * Math.PI;
+    const theta = u * Math.PI * 2;
+    const r = 50;
+
+    const anchor3D = new THREE.Vector3(
+      -r * Math.cos(theta) * Math.sin(phi),
+      r * Math.cos(phi),
+      r * Math.sin(theta) * Math.sin(phi)
+    );
+
+    // 2. Project anchor to screen NDC coordinates
+    const anchorNDC = anchor3D.clone().project(this.camera);
+
+    // 3. Current mouse position in screen NDC
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const currNDCX = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const currNDCY = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    const deltaNDCX = currNDCX - anchorNDC.x;
+    const deltaNDCY = currNDCY - anchorNDC.y;
+
+    let axis = currentLockedAxis;
+    if (!axis) {
+      if (Math.hypot(deltaNDCX * rect.width, deltaNDCY * rect.height) >= 3) {
+        axis = Math.abs(deltaNDCX) >= Math.abs(deltaNDCY) ? 'x' : 'y';
+      } else {
+        return { pixelX: anchorPixel.x, pixelY: anchorPixel.y, lockedAxis: 'x' };
+      }
+    }
+
+    // 4. Lock screen coordinate:
+    // If horizontal (axis === 'x'), lock screen Y to anchorNDC.y
+    // If vertical (axis === 'y'), lock screen X to anchorNDC.x
+    const targetNDC = new THREE.Vector2(
+      axis === 'x' ? currNDCX : anchorNDC.x,
+      axis === 'y' ? currNDCY : anchorNDC.y
+    );
+
+    this.raycaster.setFromCamera(targetNDC, this.camera);
+    const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
+    if (intersects.length > 0 && intersects[0].uv) {
+      const uv = intersects[0].uv!;
+      const px = Math.floor(uv.x * canvasWidth);
+      const py = Math.floor((1 - uv.y) * canvasHeight);
+
+      return {
+        pixelX: Math.max(0, Math.min(canvasWidth - 1, px)),
+        pixelY: Math.max(0, Math.min(canvasHeight - 1, py)),
+        lockedAxis: axis
+      };
+    }
+
     return null;
   }
 

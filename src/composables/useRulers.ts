@@ -90,33 +90,12 @@ export function useRulers() {
       return { x: rawX, y: rawY };
     }
 
-    // 5. Orthogonal Ruler (Auto H/V MediBang style):
+    // 5. Orthogonal Ruler (Screen-space true straight H/V):
     if (activeRuler.value === 'orthogonal') {
-      const anchor = strokeAnchor.value || { x: rawX, y: rawY };
-      const dx = rawX - anchor.x;
-      const dy = rawY - anchor.y;
-
-      if (!lockedOrthogonalAxis) {
-        if (Math.hypot(dx, dy) >= 2) {
-          lockedOrthogonalAxis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
-        } else {
-          return { x: Math.round(anchor.x), y: Math.round(anchor.y) };
-        }
-      }
-
-      if (lockedOrthogonalAxis === 'x') {
-        // Pure Horizontal movement (lock Y to anchor.y)
-        return {
-          x: Math.round(rawX),
-          y: Math.round(anchor.y)
-        };
-      } else {
-        // Pure Vertical movement (lock X to anchor.x)
-        return {
-          x: Math.round(anchor.x),
-          y: Math.round(rawY)
-        };
-      }
+      return {
+        x: Math.round(rawX),
+        y: Math.round(rawY)
+      };
     }
 
     return { x: rawX, y: rawY };
