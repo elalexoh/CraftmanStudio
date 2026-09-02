@@ -39,7 +39,7 @@ const viewportRef = ref<HTMLElement | null>(null);
 let engine: PanoramicEngine | null = null;
 const isOnboardingOpen = ref(false);
 
-const { activeRuler, strokeAnchor, radialCenter } = useRulers();
+const { activeRuler, strokeAnchor, linePreviewEnd, radialCenter } = useRulers();
 const { selectionPoints, hasSelection, isDrawingLasso, isInverted } = useSelection();
 
 const { masterCanvas, initDefaultLayers } = useLayers();
@@ -158,9 +158,9 @@ watch(showGroundGrid, (newVal) => {
   engine?.toggleGroundGrid(newVal);
 });
 
-watch([activeRuler, strokeAnchor, radialCenter], () => {
+watch([activeRuler, strokeAnchor, linePreviewEnd, radialCenter], () => {
   if (engine) {
-    engine.updateRulerGuides(activeRuler.value, strokeAnchor.value, radialCenter.value);
+    engine.updateRulerGuides(activeRuler.value, strokeAnchor.value, radialCenter.value, linePreviewEnd.value);
   }
 });
 

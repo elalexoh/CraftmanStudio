@@ -3,6 +3,7 @@ import type { RulerType, StrokePoint } from '../types/painting';
 
 const activeRuler = ref<RulerType>('none');
 const strokeAnchor = ref<StrokePoint | null>(null);
+const linePreviewEnd = ref<StrokePoint | null>(null);
 
 // Radial (Vanishing Point) Center
 const radialCenter = ref<StrokePoint>({ x: 2048, y: 1024 });
@@ -11,6 +12,7 @@ export function useRulers() {
   function setRuler(ruler: RulerType) {
     activeRuler.value = ruler;
     strokeAnchor.value = null;
+    linePreviewEnd.value = null;
   }
 
   function setStrokeAnchor(x: number, y: number) {
@@ -19,6 +21,11 @@ export function useRulers() {
 
   function resetStrokeAnchor() {
     strokeAnchor.value = null;
+    linePreviewEnd.value = null;
+  }
+
+  function setLinePreviewEnd(pt: StrokePoint | null) {
+    linePreviewEnd.value = pt;
   }
 
   function setRadialCenter(center: StrokePoint) {
@@ -29,7 +36,7 @@ export function useRulers() {
   /**
    * Snaps a raw input point to the active ruler guide in 360 space.
    */
-  function snapPoint(rawX: number, rawY: number, canvasWidth: number, canvasHeight: number): StrokePoint {
+  function snapPoint(rawX: number, rawY: number, _canvasWidth: number, _canvasHeight: number): StrokePoint {
     if (activeRuler.value === 'none') {
       return { x: rawX, y: rawY };
     }
@@ -70,16 +77,23 @@ export function useRulers() {
       };
     }
 
+    // 4. Two-Point Straight Line Ruler
+    if (activeRuler.value === 'two-point') {
+      return { x: rawX, y: rawY };
+    }
+
     return { x: rawX, y: rawY };
   }
 
   return {
     activeRuler: computed(() => activeRuler.value),
     strokeAnchor: computed(() => strokeAnchor.value),
+    linePreviewEnd: computed(() => linePreviewEnd.value),
     radialCenter: computed(() => radialCenter.value),
     setRuler,
     setStrokeAnchor,
     resetStrokeAnchor,
+    setLinePreviewEnd,
     setRadialCenter,
     snapPoint
   };
