@@ -1,3 +1,18 @@
+# Reglas de Flujo Git: GitFlow Workflow
+
+A partir de ahora, todo el control de versiones debe regirse por la metodología **GitFlow**:
+1. **Ramas Principales**:
+   - `main`: Código de producción estable desplegado.
+   - `dev` (o `develop`): Rama base de integración continua.
+2. **Ramas de Soporte**:
+   - `feature/<nombre-feature>`: Creadas siempre a partir de `dev`. Para cada nueva característica o funcionalidad.
+   - `bugfix/<nombre-fix>`: Creadas a partir de `dev` para solucionar errores identificados en desarrollo.
+   - `hotfix/<nombre-fix>`: Creadas a partir de `main` para parches críticos en producción.
+   - `release/<version>`: Creadas a partir de `dev` para preparar despliegues y congelar cambios.
+3. **Regla de Operación**:
+   - El agente puede preparar y ejecutar los comandos locales (`git checkout -b feature/...`, `git add`, `git commit`).
+   - Los comandos `git push` siempre se le dejan listos al usuario para su ejecución final.
+
 # Reglas de Agente: Finalización de Sesión (Session Teardown)
 
 Cuando el usuario indique finalizar la sesión (por ejemplo: "finaliza esta sesión", "terminamos la sesión"), el agente debe actuar de la siguiente forma:
