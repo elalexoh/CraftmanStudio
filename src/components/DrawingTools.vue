@@ -6,7 +6,21 @@ import { useSelection } from '../composables/useSelection';
 import { useI18n } from '../composables/useI18n';
 import type { ToolType, RulerType } from '../types/painting';
 import ColorPickerWheel from './ColorPickerWheel.vue';
-import { Pen, Eraser, PaintBucket, Pipette, Lasso, Ruler, Minus, Plus, ChevronDown, FlipHorizontal, FlipVertical, Globe } from 'lucide-vue-next';
+import {
+  Pen,
+  Eraser,
+  PaintBucket,
+  Pipette,
+  Lasso,
+  Ruler,
+  Minus,
+  Plus,
+  ChevronDown,
+  FlipHorizontal,
+  FlipVertical,
+  Globe,
+  Check
+} from 'lucide-vue-next';
 
 const { currentTool, penSize, setTool, setPenSize, penColor, flipHorizontal, flipVertical } = usePainting();
 const { activeRuler, setRuler, isSphericalCurvatureEnabled, toggleSphericalCurvature } = useRulers();
@@ -28,71 +42,77 @@ function selectRuler(ruler: RulerType) {
 
 <template>
   <aside class="drawing-tools-sidebar">
-    <!-- Tool Selector Buttons -->
+    <!-- 1. Primary Tool Buttons Grid (2x3) -->
     <div class="tool-buttons-group">
+      <!-- Pen -->
       <button
         class="tool-btn"
         :class="{ active: currentTool === 'pen' }"
         :title="t('pen')"
         @click="setTool('pen')"
       >
-        <Pen :size="18" />
+        <Pen :size="16" />
         <span>{{ t('pen') }}</span>
       </button>
 
+      <!-- Eraser -->
       <button
         class="tool-btn"
         :class="{ active: currentTool === 'eraser' }"
         :title="t('eraser')"
         @click="setTool('eraser')"
       >
-        <Eraser :size="18" />
+        <Eraser :size="16" />
         <span>{{ t('eraser') }}</span>
       </button>
 
+      <!-- Paint Bucket -->
       <button
         class="tool-btn"
         :class="{ active: currentTool === 'bucket' }"
         :title="t('bucket')"
         @click="setTool('bucket')"
       >
-        <PaintBucket :size="18" />
+        <PaintBucket :size="16" />
         <span>{{ t('bucket') }}</span>
       </button>
 
+      <!-- Eyedropper -->
       <button
         class="tool-btn"
         :class="{ active: currentTool === 'eyedropper' }"
         :title="t('eyedropper')"
         @click="setTool('eyedropper')"
       >
-        <Pipette :size="18" />
+        <Pipette :size="16" />
         <span>{{ t('eyedropper') }}</span>
       </button>
 
+      <!-- Lasso -->
       <button
         class="tool-btn"
         :class="{ active: currentTool === 'lasso' }"
         :title="t('lasso') || 'Lazo de Selección'"
         @click="setTool('lasso')"
       >
-        <Lasso :size="18" />
+        <Lasso :size="16" />
         <span>{{ t('lasso') || 'Lazo' }}</span>
       </button>
 
-      <!-- Ruler Selector with Dropdown -->
+      <!-- Ruler Dropdown Button -->
       <div class="ruler-dropdown-wrap">
         <button
-          class="tool-btn"
+          class="tool-btn ruler-btn"
           :class="{ active: activeRuler !== 'none' }"
           :title="t('ruler') || 'Reglas Guía'"
           @click="showRulerMenu = !showRulerMenu"
         >
-          <Ruler :size="18" />
-          <span>{{ activeRuler === 'none' ? (t('ruler') || 'Regla') : activeRuler === 'vertical' ? 'Vertical' : activeRuler === 'horizontal' ? 'Horizontal' : activeRuler === 'radial' ? 'Radial' : 'Línea 2P' }}</span>
-          <ChevronDown :size="10" class="arrow-icon" />
+          <Ruler :size="16" />
+          <span>{{ activeRuler === 'none' ? (t('ruler') || 'Regla') : activeRuler === 'two-point' ? 'Línea 2P' : activeRuler === 'vertical' ? 'Vertical' : activeRuler === 'horizontal' ? 'Horizontal' : 'Radial' }}</span>
+          <ChevronDown :size="11" class="arrow-icon" />
         </button>
 
+        <!-- Ruler Popup Menu -->
         <div v-if="showRulerMenu" class="ruler-menu">
           <button
             class="ruler-menu-item"
@@ -100,6 +120,7 @@ function selectRuler(ruler: RulerType) {
             @click="selectRuler('none')"
           >
             <span>Desactivada</span>
+            <Check v-if="activeRuler === 'none'" :size="12" class="check-icon" />
           </button>
           <button
             class="ruler-menu-item"
@@ -107,6 +128,7 @@ function selectRuler(ruler: RulerType) {
             @click="selectRuler('two-point')"
           >
             <span>📏 Línea Recta (2 Puntos)</span>
+            <Check v-if="activeRuler === 'two-point'" :size="12" class="check-icon" />
           </button>
           <button
             class="ruler-menu-item"
@@ -114,6 +136,7 @@ function selectRuler(ruler: RulerType) {
             @click="selectRuler('vertical')"
           >
             <span>↕️ Regla Vertical (360°)</span>
+            <Check v-if="activeRuler === 'vertical'" :size="12" class="check-icon" />
           </button>
           <button
             class="ruler-menu-item"
@@ -121,6 +144,7 @@ function selectRuler(ruler: RulerType) {
             @click="selectRuler('horizontal')"
           >
             <span>↔️ Regla Horizontal (Latitud)</span>
+            <Check v-if="activeRuler === 'horizontal'" :size="12" class="check-icon" />
           </button>
           <button
             class="ruler-menu-item"
@@ -128,17 +152,18 @@ function selectRuler(ruler: RulerType) {
             @click="selectRuler('radial')"
           >
             <span>🎯 Regla Radial (Perspectiva)</span>
+            <Check v-if="activeRuler === 'radial'" :size="12" class="check-icon" />
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 360 Curvature Toggle (Shown when a ruler is active) -->
+    <!-- 2. Ruler Curvature Toggle (Shown only when a ruler is active) -->
     <div v-if="activeRuler !== 'none'" class="curvature-toggle-wrap">
       <button
         class="curvature-btn"
         :class="{ 'is-active': isSphericalCurvatureEnabled }"
-        :title="isSphericalCurvatureEnabled ? 'Curvatura 360° Activa: Se deforma siguiendo la perspectiva esférica' : 'Modo Plano 2D: Línea recta plana en el mapa sin deformación'"
+        :title="isSphericalCurvatureEnabled ? 'Curvatura 360° Activa: Las reglas siguen la perspectiva esférica' : 'Modo Plano 2D: Líneas rectas sin deformación'"
         @click="toggleSphericalCurvature()"
       >
         <Globe :size="13" />
@@ -146,14 +171,14 @@ function selectRuler(ruler: RulerType) {
       </button>
     </div>
 
-    <!-- Transform / Flip Actions -->
+    <!-- 3. Flip Transformations -->
     <div class="flip-actions-group">
       <button
         class="flip-btn"
         :title="t('flipHorizontal') || 'Voltear Horizontal (Espejo)'"
         @click="flipHorizontal"
       >
-        <FlipHorizontal :size="15" />
+        <FlipHorizontal :size="14" />
         <span>Voltear H</span>
       </button>
       <button
@@ -161,22 +186,33 @@ function selectRuler(ruler: RulerType) {
         :title="t('flipVertical') || 'Voltear Vertical'"
         @click="flipVertical"
       >
-        <FlipVertical :size="15" />
+        <FlipVertical :size="14" />
         <span>Voltear V</span>
       </button>
     </div>
 
     <div class="divider"></div>
 
-    <!-- Pen Size Control -->
+    <!-- 4. Pen Size Slider & Stepper -->
     <div class="size-control-group">
       <div class="size-header">
         <span class="size-label">{{ t('thickness') }}</span>
+        <div class="size-value-badge">
+          <input
+            type="number"
+            min="1"
+            max="50"
+            :value="penSize"
+            class="size-num-input"
+            @input="setPenSize(parseInt(($event.target as HTMLInputElement).value, 10) || 1)"
+          />
+          <span class="size-unit">px</span>
+        </div>
       </div>
 
       <div class="size-slider-row">
         <button class="step-btn" :title="t('thinner')" @click="adjustSize(-1)">
-          <Minus :size="12" />
+          <Minus :size="11" />
         </button>
         <input
           type="range"
@@ -187,23 +223,14 @@ function selectRuler(ruler: RulerType) {
           @input="setPenSize(parseInt(($event.target as HTMLInputElement).value, 10))"
         />
         <button class="step-btn" :title="t('thicker')" @click="adjustSize(1)">
-          <Plus :size="12" />
+          <Plus :size="11" />
         </button>
       </div>
-
-      <input
-        type="number"
-        min="1"
-        max="50"
-        :value="penSize"
-        class="size-num-input"
-        @input="setPenSize(parseInt(($event.target as HTMLInputElement).value, 10))"
-      />
     </div>
 
     <div class="divider"></div>
 
-    <!-- Color Picker Wheel -->
+    <!-- 5. Color Picker Wheel -->
     <div class="color-picker-section">
       <ColorPickerWheel />
     </div>
@@ -215,49 +242,55 @@ function selectRuler(ruler: RulerType) {
   position: absolute;
   top: 60px;
   left: 12px;
-  width: 210px;
+  width: 216px;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   z-index: 90;
   user-select: none;
 }
 
+/* 1. Primary Tool Buttons Grid */
 .tool-buttons-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 5px;
 }
 
 .tool-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  padding: 8px 6px;
-  font-size: 12px;
+  padding: 7px 6px;
+  font-size: 11px;
+  font-weight: 500;
   color: #334155;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
 
   &:hover {
     background: #f1f5f9;
     border-color: #94a3b8;
+    color: #0f172a;
   }
 
   &.active {
     background: #2563eb;
     border-color: #1d4ed8;
-    color: #fff;
+    color: #ffffff;
   }
 }
 
@@ -265,34 +298,35 @@ function selectRuler(ruler: RulerType) {
   position: relative;
   width: 100%;
 
-  .tool-btn {
-    width: 100%;
+  .ruler-btn {
     .arrow-icon {
       margin-left: auto;
+      opacity: 0.7;
     }
   }
 
   .ruler-menu {
     position: absolute;
     top: calc(100% + 4px);
-    left: 0;
-    width: 200px;
+    left: -96px; // Align to sidebar width
+    width: 190px;
     background: #ffffff;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     padding: 4px;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    z-index: 100;
+    z-index: 120;
 
     .ruler-menu-item {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 6px;
-      padding: 7px 10px;
-      font-size: 12px;
+      padding: 6px 8px;
+      font-size: 11px;
       font-weight: 500;
       color: #334155;
       background: transparent;
@@ -300,7 +334,7 @@ function selectRuler(ruler: RulerType) {
       border-radius: 5px;
       cursor: pointer;
       text-align: left;
-      transition: all 0.15s;
+      transition: all 0.15s ease;
 
       &:hover {
         background: #f1f5f9;
@@ -312,12 +346,17 @@ function selectRuler(ruler: RulerType) {
         color: #2563eb;
         font-weight: 700;
       }
+
+      .check-icon {
+        color: #2563eb;
+      }
     }
   }
 }
 
+/* 2. Curvature Toggle */
 .curvature-toggle-wrap {
-  margin-top: 6px;
+  width: 100%;
 }
 
 .curvature-btn {
@@ -325,16 +364,17 @@ function selectRuler(ruler: RulerType) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   font-size: 11px;
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 
   &:hover {
     background: #f1f5f9;
@@ -349,27 +389,28 @@ function selectRuler(ruler: RulerType) {
   }
 }
 
+/* 3. Flip Transformation Actions */
 .flip-actions-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 5px;
 }
 
 .flip-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  padding: 6px 4px;
+  padding: 5px 4px;
   font-size: 11px;
   font-weight: 500;
   color: #334155;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 
   &:hover {
     background: #f1f5f9;
@@ -384,71 +425,97 @@ function selectRuler(ruler: RulerType) {
   }
 }
 
+/* 4. Divider */
 .divider {
   height: 1px;
   background: #e2e8f0;
-  margin: 0 -2px;
+  margin: 1px 0;
 }
 
+/* 5. Size Control Group */
 .size-control-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .size-header {
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.size-label {
+  font-size: 11px;
   font-weight: 600;
   color: #475569;
+}
+
+.size-value-badge {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.size-num-input {
+  width: 38px;
+  padding: 2px 3px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  text-align: center;
+  background: #f8fafc;
+
+  &:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #ffffff;
+  }
+}
+
+.size-unit {
+  font-size: 10px;
+  color: #94a3b8;
 }
 
 .size-slider-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-
-  .step-btn {
-    width: 22px;
-    height: 22px;
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-
-    &:hover {
-      background: #e2e8f0;
-    }
-  }
-
-  .size-slider {
-    flex: 1;
-    cursor: pointer;
-  }
+  gap: 4px;
 }
 
-.size-num-input {
-  width: 100%;
-  padding: 4px 6px;
+.step-btn {
+  width: 22px;
+  height: 22px;
+  background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
-  font-size: 12px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
 }
 
+.size-slider {
+  flex: 1;
+  height: 4px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+/* 6. Color Picker Section */
 .color-picker-section {
   display: flex;
   flex-direction: column;
-}
-
-@media (max-width: 768px) {
-  .drawing-tools-sidebar {
-    top: 56px;
-    left: 8px;
-    width: 190px;
-    padding: 8px;
-  }
 }
 </style>
