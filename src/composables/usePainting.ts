@@ -524,12 +524,12 @@ export function usePainting() {
         tempCtx.drawImage(layer.canvas, minX, minY, selW, selH, 0, 0, selW, selH);
 
         layer.ctx.save();
-        applySelectionClip(layer.ctx);
+        applySelectionClip(layer.ctx, w, h);
         layer.ctx.clearRect(0, 0, w, h);
         layer.ctx.restore();
 
         layer.ctx.save();
-        applySelectionClip(layer.ctx);
+        applySelectionClip(layer.ctx, w, h);
         layer.ctx.translate(minX + selW / 2, minY + selH / 2);
         layer.ctx.scale(-1, 1);
         layer.ctx.drawImage(tempCanvas, -selW / 2, -selH / 2);
@@ -593,12 +593,12 @@ export function usePainting() {
         tempCtx.drawImage(layer.canvas, minX, minY, selW, selH, 0, 0, selW, selH);
 
         layer.ctx.save();
-        applySelectionClip(layer.ctx);
+        applySelectionClip(layer.ctx, w, h);
         layer.ctx.clearRect(0, 0, w, h);
         layer.ctx.restore();
 
         layer.ctx.save();
-        applySelectionClip(layer.ctx);
+        applySelectionClip(layer.ctx, w, h);
         layer.ctx.translate(minX + selW / 2, minY + selH / 2);
         layer.ctx.scale(1, -1);
         layer.ctx.drawImage(tempCanvas, -selW / 2, -selH / 2);

@@ -132,9 +132,11 @@ export function useSelection() {
     return path;
   }
 
-  function applySelectionClip(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  function applySelectionClip(ctx: CanvasRenderingContext2D, width?: number, height?: number) {
     if (!hasSelection.value) return;
-    const path = getSelectionPath(width, height);
+    const canvasW = width ?? ctx.canvas.width;
+    const canvasH = height ?? ctx.canvas.height;
+    const path = getSelectionPath(canvasW, canvasH);
     if (path) {
       ctx.clip(path, isInverted.value ? 'evenodd' : 'nonzero');
     }
