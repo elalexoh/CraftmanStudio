@@ -45,6 +45,7 @@ export const translations = {
     tabSettings: 'Ajustes',
     close: 'Cerrar',
     seamOffset: 'Desplazamiento de costura',
+    dragToAdjustSeam: 'Arrastra para ajustar el punto de origen de la costura 360°',
     language: 'Idioma',
     hotkeysConfig: 'Configurar Atajos (Hotkeys)',
     eyedropperHold: 'Cuentagotas temporal (Mantener)',

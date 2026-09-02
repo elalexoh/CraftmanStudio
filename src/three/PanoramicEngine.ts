@@ -18,6 +18,8 @@ export class PanoramicEngine {
   private groundGridMaterial: THREE.ShaderMaterial | null = null;
   private horizontalGridMaterial: THREE.ShaderMaterial | null = null;
   private horizonGuide: THREE.LineLoop | null = null;
+  private sphereMesh: THREE.Mesh | null = null;
+  private canvasTexture: THREE.CanvasTexture | null = null;
   private raycaster: THREE.Raycaster;
 
   // Camera angles (in radians)
@@ -88,9 +90,11 @@ export class PanoramicEngine {
     this.canvasTexture.wrapS = THREE.RepeatWrapping;
     this.canvasTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-    const mat = this.sphereMesh.material as THREE.MeshBasicMaterial;
-    mat.map = this.canvasTexture;
-    mat.needsUpdate = true;
+    if (this.sphereMesh) {
+      const mat = this.sphereMesh.material as THREE.MeshBasicMaterial;
+      mat.map = this.canvasTexture;
+      mat.needsUpdate = true;
+    }
     this.notifyTextureUpdated();
   }
 
@@ -590,6 +594,7 @@ export class PanoramicEngine {
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
+    if (!this.sphereMesh) return null;
     this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
     const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
 

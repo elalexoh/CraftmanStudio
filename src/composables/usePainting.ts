@@ -57,7 +57,7 @@ let lastMidX = 0;
 let lastMidY = 0;
 
 export function usePainting() {
-  const { layers, activeLayer, recomposeMaster, masterCtx, canvasWidth, canvasHeight } = useLayers();
+  const { layers, activeLayer, recomposeMaster, masterCanvas, masterCtx, canvasWidth, canvasHeight } = useLayers();
   const { hasSelection, startLasso, continueLasso, endLasso, setSelectionState, applySelectionClip, clearInsideSelection } = useSelection();
   const { snapPoint, setStrokeAnchor, resetStrokeAnchor } = useRulers();
 
