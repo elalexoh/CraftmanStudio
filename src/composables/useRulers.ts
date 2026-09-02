@@ -4,6 +4,7 @@ import type { RulerType, StrokePoint } from '../types/painting';
 const activeRuler = ref<RulerType>('none');
 const strokeAnchor = ref<StrokePoint | null>(null);
 const linePreviewEnd = ref<StrokePoint | null>(null);
+const isSphericalCurvatureEnabled = ref<boolean>(true);
 
 // Radial (Vanishing Point) Center
 const radialCenter = ref<StrokePoint>({ x: 2048, y: 1024 });
@@ -13,6 +14,10 @@ export function useRulers() {
     activeRuler.value = ruler;
     strokeAnchor.value = null;
     linePreviewEnd.value = null;
+  }
+
+  function toggleSphericalCurvature(val?: boolean) {
+    isSphericalCurvatureEnabled.value = typeof val === 'boolean' ? val : !isSphericalCurvatureEnabled.value;
   }
 
   function setStrokeAnchor(x: number, y: number) {
@@ -90,7 +95,9 @@ export function useRulers() {
     strokeAnchor: computed(() => strokeAnchor.value),
     linePreviewEnd: computed(() => linePreviewEnd.value),
     radialCenter: computed(() => radialCenter.value),
+    isSphericalCurvatureEnabled: computed(() => isSphericalCurvatureEnabled.value),
     setRuler,
+    toggleSphericalCurvature,
     setStrokeAnchor,
     resetStrokeAnchor,
     setLinePreviewEnd,

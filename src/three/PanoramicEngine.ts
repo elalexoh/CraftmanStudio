@@ -295,7 +295,8 @@ export class PanoramicEngine {
     rulerType: string,
     anchor?: { x: number; y: number } | null,
     center?: { x: number; y: number },
-    previewEnd?: { x: number; y: number } | null
+    previewEnd?: { x: number; y: number } | null,
+    isSphericalCurvatureEnabled: boolean = true
   ) {
     // Clear previous ruler objects and dispose geometries
     while (this.rulerGuideGroup.children.length > 0) {
