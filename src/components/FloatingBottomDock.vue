@@ -19,10 +19,10 @@ const { currentLanguage } = useI18n();
       target="_blank"
       rel="noopener noreferrer"
       class="dock-btn dev-btn"
-      :title="currentLanguage === 'ja' ? '開発者ポートフォリオ（Frederick A. Gonzalez）' : currentLanguage === 'en' ? 'Developer Portfolio (Frederick A. Gonzalez)' : 'Desarrollado por Frederick A. Gonzalez - Ver Portafolio'"
+      :title="currentLanguage === 'ja' ? '開発者ポートフォリオ（Deeply Oku）' : currentLanguage === 'en' ? 'Developer Portfolio (Deeply Oku)' : 'Desarrollado por Deeply Oku - Ver Portafolio'"
     >
       <span class="dev-emoji">👺</span>
-      <span class="dev-name">Frederick A. Gonzalez</span>
+      <span class="dev-name">Deeply Oku</span>
       <ExternalLink :size="11" class="ext-icon" />
     </a>
   </div>

@@ -283,11 +283,21 @@ export class PanoramicEngine {
   }
 
   private rulerGuideGroup: THREE.Group = new THREE.Group();
+  private rulerLineMaterial = new THREE.LineBasicMaterial({
+    color: 0x06b6d4, // Bright cyan
+    transparent: true,
+    opacity: 0.85,
+    depthTest: false,
+    depthWrite: false
+  });
 
   public updateRulerGuides(rulerType: string, anchor?: { x: number; y: number } | null, center?: { x: number; y: number }) {
-    // Clear previous ruler objects
+    // Clear previous ruler objects and dispose geometries
     while (this.rulerGuideGroup.children.length > 0) {
-      const obj = this.rulerGuideGroup.children[0];
+      const obj = this.rulerGuideGroup.children[0] as THREE.Line;
+      if (obj && obj.geometry) {
+        obj.geometry.dispose();
+      }
       this.rulerGuideGroup.remove(obj);
     }
 
@@ -311,13 +321,7 @@ export class PanoramicEngine {
       return new THREE.Vector3(x, y, z);
     };
 
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x06b6d4, // Bright cyan
-      transparent: true,
-      opacity: 0.85,
-      depthTest: false,
-      depthWrite: false
-    });
+    const lineMaterial = this.rulerLineMaterial;
 
     if (rulerType === 'vertical') {
       // If stroke anchor is active, draw primary active meridian line

@@ -53,7 +53,10 @@ export function useLayers() {
     recomposeMaster();
   }
 
-  function recomposeMaster() {
+  let isRecomposePending = false;
+
+  function recomposeMasterImmediate() {
+    isRecomposePending = false;
     masterCtx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
     // Draw from bottom (index 0) to top
     for (const layer of layers.value) {
@@ -65,6 +68,12 @@ export function useLayers() {
       }
     }
     notifyCanvasUpdated();
+  }
+
+  function recomposeMaster() {
+    if (isRecomposePending) return;
+    isRecomposePending = true;
+    requestAnimationFrame(recomposeMasterImmediate);
   }
 
   function addLayer(name?: string, index?: number): Layer {
@@ -235,6 +244,7 @@ export function useLayers() {
     toggleLayerVisibility,
     renameLayer,
     recomposeMaster,
+    recomposeMasterImmediate,
     setCanvasResolution,
     loadLayersFromData,
     serializeLayers

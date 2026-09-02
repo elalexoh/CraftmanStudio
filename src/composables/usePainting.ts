@@ -57,8 +57,8 @@ let lastMidX = 0;
 let lastMidY = 0;
 
 export function usePainting() {
-  const { layers, activeLayer, recomposeMaster, masterCanvas, masterCtx, canvasWidth, canvasHeight } = useLayers();
-  const { hasSelection, startLasso, continueLasso, endLasso, setSelectionState, applySelectionClip, clearInsideSelection } = useSelection();
+  const { layers, activeLayer, recomposeMaster, recomposeMasterImmediate, masterCanvas, masterCtx, canvasWidth, canvasHeight } = useLayers();
+  const { selectionPoints, hasSelection, startLasso, continueLasso, endLasso, setSelectionState, applySelectionClip, clearInsideSelection } = useSelection();
   const { snapPoint, setStrokeAnchor, resetStrokeAnchor } = useRulers();
 
   const currentSize = computed(() => toolSizes.value[currentTool.value] || 3);
@@ -190,6 +190,13 @@ export function usePainting() {
     const pixelX = snapped.x;
     const pixelY = snapped.y;
 
+    // Skip redundant subpixel movements (especially on constrained ruler axis)
+    const rawDeltaX = pixelX - lastX;
+    const rawDeltaY = pixelY - lastY;
+    if (Math.abs(rawDeltaX) < 0.6 && Math.abs(rawDeltaY) < 0.6) {
+      return;
+    }
+
     if (currentTool.value === 'eyedropper') {
       pickColor(pixelX, pixelY);
       return;
@@ -312,7 +319,7 @@ export function usePainting() {
     currentStrokePoints = [];
     beforeImageData = null;
     resetStrokeAnchor();
-    recomposeMaster();
+    recomposeMasterImmediate();
   }
 
   function pickColor(pixelX: number, pixelY: number) {
@@ -487,6 +494,144 @@ export function usePainting() {
     recomposeMaster();
   }
 
+  function flipHorizontal() {
+    const layer = activeLayer.value;
+    if (!layer || !layer.visible) return;
+
+    const w = layer.canvas.width;
+    const h = layer.canvas.height;
+    const before = layer.ctx.getImageData(0, 0, w, h);
+
+    if (hasSelection.value && selectionPoints.value.length >= 3) {
+      // 1. Flip only within selection bounding box
+      const pts = selectionPoints.value;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      pts.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      });
+
+      const selW = Math.max(1, Math.round(maxX - minX));
+      const selH = Math.max(1, Math.round(maxY - minY));
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = selW;
+      tempCanvas.height = selH;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(layer.canvas, minX, minY, selW, selH, 0, 0, selW, selH);
+
+        layer.ctx.save();
+        applySelectionClip(layer.ctx);
+        layer.ctx.clearRect(0, 0, w, h);
+        layer.ctx.restore();
+
+        layer.ctx.save();
+        applySelectionClip(layer.ctx);
+        layer.ctx.translate(minX + selW / 2, minY + selH / 2);
+        layer.ctx.scale(-1, 1);
+        layer.ctx.drawImage(tempCanvas, -selW / 2, -selH / 2);
+        layer.ctx.restore();
+      }
+    } else {
+      // 2. Flip entire active layer horizontally
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = w;
+      tempCanvas.height = h;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(layer.canvas, 0, 0);
+        layer.ctx.clearRect(0, 0, w, h);
+        layer.ctx.save();
+        layer.ctx.translate(w, 0);
+        layer.ctx.scale(-1, 1);
+        layer.ctx.drawImage(tempCanvas, 0, 0);
+        layer.ctx.restore();
+      }
+    }
+
+    const after = layer.ctx.getImageData(0, 0, w, h);
+    strokeHistory.value.push({
+      type: 'layer',
+      layerId: layer.id,
+      before,
+      after
+    });
+    redoHistory.value = [];
+    recomposeMaster();
+  }
+
+  function flipVertical() {
+    const layer = activeLayer.value;
+    if (!layer || !layer.visible) return;
+
+    const w = layer.canvas.width;
+    const h = layer.canvas.height;
+    const before = layer.ctx.getImageData(0, 0, w, h);
+
+    if (hasSelection.value && selectionPoints.value.length >= 3) {
+      // 1. Flip only within selection bounding box vertically
+      const pts = selectionPoints.value;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      pts.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      });
+
+      const selW = Math.max(1, Math.round(maxX - minX));
+      const selH = Math.max(1, Math.round(maxY - minY));
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = selW;
+      tempCanvas.height = selH;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(layer.canvas, minX, minY, selW, selH, 0, 0, selW, selH);
+
+        layer.ctx.save();
+        applySelectionClip(layer.ctx);
+        layer.ctx.clearRect(0, 0, w, h);
+        layer.ctx.restore();
+
+        layer.ctx.save();
+        applySelectionClip(layer.ctx);
+        layer.ctx.translate(minX + selW / 2, minY + selH / 2);
+        layer.ctx.scale(1, -1);
+        layer.ctx.drawImage(tempCanvas, -selW / 2, -selH / 2);
+        layer.ctx.restore();
+      }
+    } else {
+      // 2. Flip entire active layer vertically
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = w;
+      tempCanvas.height = h;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(layer.canvas, 0, 0);
+        layer.ctx.clearRect(0, 0, w, h);
+        layer.ctx.save();
+        layer.ctx.translate(0, h);
+        layer.ctx.scale(1, -1);
+        layer.ctx.drawImage(tempCanvas, 0, 0);
+        layer.ctx.restore();
+      }
+    }
+
+    const after = layer.ctx.getImageData(0, 0, w, h);
+    strokeHistory.value.push({
+      type: 'layer',
+      layerId: layer.id,
+      before,
+      after
+    });
+    redoHistory.value = [];
+    recomposeMaster();
+  }
+
   return {
     currentTool: computed(() => currentTool.value),
     penSize: currentSize,
@@ -502,6 +647,8 @@ export function usePainting() {
     continueStroke,
     endStroke,
     clearActiveLayer,
+    flipHorizontal,
+    flipVertical,
     undo,
     redo,
     floodFill,

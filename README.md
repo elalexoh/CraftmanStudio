@@ -64,7 +64,7 @@ npm run build
 ---
 
 ## 👨‍💻 Desarrollador
-Creado y desarrollado por **Frederick A. Gonzalez**.
+Creado y desarrollado por **Deeply Oku**.
 * 🌐 [👺 Portafolio Web](https://deeply-portfolio.netlify.app/)
 * 💼 Desarrollador Full-Stack, Arquitectura Web & 3D Interactivo.
 

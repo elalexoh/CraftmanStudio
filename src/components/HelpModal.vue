@@ -121,7 +121,7 @@ const { t } = useI18n();
         <!-- Credits & Inspiration -->
         <div class="credits-box">
           <div class="credit-line">
-            <span>👺 Desarrollado por <strong>Frederick A. Gonzalez</strong></span>
+            <span>👺 Desarrollado por <strong>Deeply Oku</strong></span>
             <a
               href="https://deeply-portfolio.netlify.app/"
               target="_blank"

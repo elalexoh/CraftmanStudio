@@ -6,9 +6,9 @@ import { useSelection } from '../composables/useSelection';
 import { useI18n } from '../composables/useI18n';
 import type { ToolType, RulerType } from '../types/painting';
 import ColorPickerWheel from './ColorPickerWheel.vue';
-import { Pen, Eraser, PaintBucket, Pipette, Lasso, Ruler, Minus, Plus, ChevronDown } from 'lucide-vue-next';
+import { Pen, Eraser, PaintBucket, Pipette, Lasso, Ruler, Minus, Plus, ChevronDown, FlipHorizontal, FlipVertical } from 'lucide-vue-next';
 
-const { currentTool, penSize, setTool, setPenSize, penColor } = usePainting();
+const { currentTool, penSize, setTool, setPenSize, penColor, flipHorizontal, flipVertical } = usePainting();
 const { activeRuler, setRuler } = useRulers();
 const { hasSelection, deselect } = useSelection();
 const { t } = useI18n();
@@ -124,6 +124,26 @@ function selectRuler(ruler: RulerType) {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Transform / Flip Actions -->
+    <div class="flip-actions-group">
+      <button
+        class="flip-btn"
+        :title="t('flipHorizontal') || 'Voltear Horizontal (Espejo)'"
+        @click="flipHorizontal"
+      >
+        <FlipHorizontal :size="15" />
+        <span>Voltear H</span>
+      </button>
+      <button
+        class="flip-btn"
+        :title="t('flipVertical') || 'Voltear Vertical'"
+        @click="flipVertical"
+      >
+        <FlipVertical :size="15" />
+        <span>Voltear V</span>
+      </button>
     </div>
 
     <div class="divider"></div>
@@ -273,6 +293,41 @@ function selectRuler(ruler: RulerType) {
         font-weight: 700;
       }
     }
+  }
+}
+
+.flip-actions-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.flip-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #0f172a;
+  }
+
+  &:active {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
   }
 }
 

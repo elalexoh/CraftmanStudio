@@ -15,7 +15,7 @@ const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
-const { t, currentLanguage } = useI18n();
+const { currentLanguage } = useI18n();
 
 function closeGuide() {
   try {
@@ -29,33 +29,33 @@ function closeGuide() {
 
 <template>
   <div class="guide-backdrop" @click.self="closeGuide">
-    <div class="guide-card">
-      <!-- Header -->
+    <div class="guide-panel">
+      <!-- 1. Header -->
       <div class="guide-header">
         <div class="header-branding">
           <div class="header-icon-badge">
-            <Compass :size="20" />
+            <Compass :size="18" />
           </div>
           <div>
             <h2 class="guide-title">
               {{ currentLanguage === 'ja' ? 'Craftsman Studio クイックガイド' : currentLanguage === 'en' ? 'Craftsman Studio Quick Guide' : 'Guía Rápida de Craftsman Studio' }}
             </h2>
             <p class="guide-subtitle">
-              {{ currentLanguage === 'ja' ? '3Dカメラ操作と隠れたショートカット操作' : currentLanguage === 'en' ? 'Core 3D navigation & essential gestures' : 'Controles esenciales de cámara 3D y gestos ocultos' }}
+              {{ currentLanguage === 'ja' ? '3Dカメラ操作と隠れたショートカット操作' : currentLanguage === 'en' ? 'Core 3D navigation & essential gestures' : 'Controles esenciales de cámara 3D y gestos en el lienzo' }}
             </p>
           </div>
         </div>
-        <button class="close-btn" title="Cerrar" @click="closeGuide">
-          <X :size="18" />
+        <button class="btn-close" title="Cerrar" @click="closeGuide">
+          <X :size="16" />
         </button>
       </div>
 
-      <!-- Quick Cards Grid -->
+      <!-- 2. Quick Cards Grid -->
       <div class="guide-grid">
         <!-- 1. Camara 3D -->
         <div class="quick-card">
-          <div class="card-icon-wrap" style="color: #38bdf8; background: rgba(56, 189, 248, 0.12);">
-            <Move3d :size="18" />
+          <div class="card-icon-wrap">
+            <Move3d :size="16" />
           </div>
           <div class="card-content">
             <h4 class="card-title">
@@ -76,8 +76,8 @@ function closeGuide() {
 
         <!-- 2. Gestos de Pincel -->
         <div class="quick-card">
-          <div class="card-icon-wrap" style="color: #a855f7; background: rgba(168, 85, 247, 0.12);">
-            <MousePointerClick :size="18" />
+          <div class="card-icon-wrap">
+            <MousePointerClick :size="16" />
           </div>
           <div class="card-content">
             <h4 class="card-title">
@@ -98,8 +98,8 @@ function closeGuide() {
 
         <!-- 3. Reglas 360 -->
         <div class="quick-card">
-          <div class="card-icon-wrap" style="color: #06b6d4; background: rgba(6, 182, 212, 0.12);">
-            <Ruler :size="18" />
+          <div class="card-icon-wrap">
+            <Ruler :size="16" />
           </div>
           <div class="card-content">
             <h4 class="card-title">
@@ -120,8 +120,8 @@ function closeGuide() {
 
         <!-- 4. Lazo y Atajos -->
         <div class="quick-card">
-          <div class="card-icon-wrap" style="color: #ec4899; background: rgba(236, 72, 153, 0.12);">
-            <Lasso :size="18" />
+          <div class="card-icon-wrap">
+            <Lasso :size="16" />
           </div>
           <div class="card-content">
             <h4 class="card-title">
@@ -129,7 +129,7 @@ function closeGuide() {
             </h4>
             <ul class="card-list">
               <li>
-                <strong>Ctrl + D:</strong> {{ currentLanguage === 'ja' ? '選択解除' : currentLanguage === 'en' ? 'Deselect' : 'Deseleccionar área' }}
+                <strong>Ctrl + D:</strong> {{ currentLanguage === 'ja' ? '選択解除' : currentLanguage === 'en' ? 'Deselect' : 'Deseleccionar' }}
                 &nbsp;|&nbsp;
                 <strong>Ctrl + Shift + I:</strong> {{ currentLanguage === 'ja' ? '反転' : currentLanguage === 'en' ? 'Invert' : 'Invertir' }}
               </li>
@@ -141,41 +141,41 @@ function closeGuide() {
         </div>
       </div>
 
-      <!-- Developer & Inspiration Footer Bar -->
-      <div class="guide-footer">
-        <div class="dev-banner">
-          <span class="dev-icon">👺</span>
-          <span class="dev-text">
-            {{ currentLanguage === 'ja' ? '開発者:' : currentLanguage === 'en' ? 'Developed by:' : 'Desarrollado por:' }}
-            <strong>Frederick A. Gonzalez</strong>
-          </span>
+      <!-- 3. Primary Action Block (Above Disclaimers) -->
+      <div class="guide-action-row">
+        <button class="btn-primary-action" @click="closeGuide">
+          <CheckCircle2 :size="15" />
+          <span>{{ currentLanguage === 'ja' ? '理解しました' : currentLanguage === 'en' ? 'Got it!' : '¡Entendido!' }}</span>
+        </button>
+      </div>
+
+      <!-- 4. Disclaimers & Credits Bar (Cleanly separated at bottom) -->
+      <div class="guide-disclaimers-row">
+        <div class="credit-item">
+          <span>👺 Desarrollador: <strong>Deeply Oku</strong></span>
           <a
             href="https://deeply-portfolio.netlify.app/"
             target="_blank"
             rel="noopener noreferrer"
-            class="dev-portfolio-link"
+            class="credit-link"
           >
-            <span>{{ currentLanguage === 'ja' ? 'ポートフォリオ' : currentLanguage === 'en' ? 'Portfolio' : 'Portafolio' }}</span>
-            <ExternalLink :size="11" />
+            <span>Portafolio</span>
+            <ExternalLink :size="10" />
           </a>
-          <span class="credit-sep">•</span>
-          <span class="inspiration-text">
-            {{ currentLanguage === 'ja' ? '着想元:' : currentLanguage === 'en' ? 'Inspired by:' : 'Inspirado en:' }}
-            <a
-              href="https://tools.neco-sara.com/tools/gururi-paint/"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inspiration-link"
-            >
-              ぐるりペイント (neco-sara)
-            </a>
-          </span>
         </div>
 
-        <button class="btn-understand" @click="closeGuide">
-          <CheckCircle2 :size="16" />
-          <span>{{ currentLanguage === 'ja' ? '理解しました' : currentLanguage === 'en' ? 'Got it!' : '¡Entendido!' }}</span>
-        </button>
+        <div class="credit-item inspiration-item">
+          <span>Inspirado en</span>
+          <a
+            href="https://tools.neco-sara.com/tools/gururi-paint/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="credit-link"
+          >
+            <span>ぐるりペイント (neco-sara)</span>
+            <ExternalLink :size="10" />
+          </a>
+        </div>
       </div>
     </div>
   </div>
@@ -185,87 +185,90 @@ function closeGuide() {
 .guide-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  animation: fadeIn 0.2s ease-out;
+  padding: 16px;
+  animation: fadeIn 0.15s ease-out;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.97); }
+  from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: scale(1); }
 }
 
-.guide-card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 16px;
+.guide-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   width: 100%;
-  max-width: 660px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  max-width: 620px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  color: #f8fafc;
+  color: #334155;
 }
 
 .guide-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.15rem 1.4rem 0.85rem;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .header-branding {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .header-icon-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #2563eb;
 }
 
 .guide-title {
-  font-size: 1.15rem;
+  font-size: 14px;
   font-weight: 700;
   margin: 0;
-  color: #f8fafc;
+  color: #1e293b;
 }
 
 .guide-subtitle {
-  font-size: 0.8rem;
-  color: #94a3b8;
-  margin: 2px 0 0;
+  font-size: 11px;
+  color: #64748b;
+  margin: 1px 0 0;
 }
 
-.close-btn {
+.btn-close {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: #64748b;
   cursor: pointer;
-  padding: 6px;
-  border-radius: 8px;
+  padding: 5px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
 
   &:hover {
-    background: #334155;
-    color: #f8fafc;
+    background: #e2e8f0;
+    color: #0f172a;
   }
 }
 
@@ -273,28 +276,32 @@ function closeGuide() {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
-  padding: 1.15rem 1.4rem;
+  padding: 14px 16px 10px;
+  background: #ffffff;
 
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
-    max-height: 60vh;
+    max-height: 55vh;
     overflow-y: auto;
   }
 }
 
 .quick-card {
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 0.85rem 0.95rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
   display: flex;
   gap: 10px;
   align-items: flex-start;
 }
 
 .card-icon-wrap {
-  padding: 7px;
-  border-radius: 8px;
+  padding: 6px;
+  border-radius: 6px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #2563eb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -306,18 +313,18 @@ function closeGuide() {
 }
 
 .card-title {
-  font-size: 0.88rem;
+  font-size: 12px;
   font-weight: 600;
-  color: #f8fafc;
-  margin: 0 0 0.35rem;
+  color: #1e293b;
+  margin: 0 0 4px;
 }
 
 .card-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  font-size: 0.78rem;
-  color: #94a3b8;
+  font-size: 11px;
+  color: #475569;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -325,97 +332,75 @@ function closeGuide() {
 
   li {
     strong {
-      color: #e2e8f0;
+      color: #0f172a;
     }
   }
 }
 
-.guide-footer {
+/* 3. Dedicated Action Row (Above Disclaimers) */
+.guide-action-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.85rem 1.4rem;
-  background: #0f172a;
-  border-top: 1px solid rgba(51, 65, 85, 0.8);
-  flex-wrap: wrap;
-  gap: 10px;
+  justify-content: flex-end;
+  padding: 8px 16px 12px;
+  background: #ffffff;
 }
 
-.dev-banner {
+.btn-primary-action {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8rem;
-  color: #cbd5e1;
-
-  .dev-icon {
-    font-size: 1.1rem;
-  }
-
-  strong {
-    color: #ffffff;
-  }
-}
-
-.dev-portfolio-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: rgba(99, 102, 241, 0.18);
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  color: #a5b4fc;
-  padding: 2px 7px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-decoration: none;
-  margin-left: 2px;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: #6366f1;
-    color: #ffffff;
-  }
-}
-
-.credit-sep {
-  color: #475569;
-  margin: 0 2px;
-}
-
-.inspiration-text {
-  font-size: 0.75rem;
-  color: #94a3b8;
-}
-
-.inspiration-link {
-  color: #38bdf8;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color 0.15s;
-
-  &:hover {
-    color: #7dd3fc;
-  }
-}
-
-.btn-understand {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #3b82f6;
+  background: #2563eb;
   color: #ffffff;
   border: none;
-  padding: 7px 16px;
-  border-radius: 8px;
-  font-size: 0.84rem;
+  padding: 7px 18px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 
   &:hover {
-    background: #2563eb;
-    transform: translateY(-1px);
+    background: #1d4ed8;
+  }
+}
+
+/* 4. Dedicated Disclaimers Row (At Bottom) */
+.guide-disclaimers-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  font-size: 11px;
+  color: #64748b;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  strong {
+    color: #1e293b;
+  }
+}
+
+.credit-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.credit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: #1d4ed8;
   }
 }
 </style>

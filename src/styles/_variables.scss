@@ -1,4 +1,51 @@
-// Variables de diseño y tema oscuro para artistas
+// =========================================================
+// CRAFTSMAN STUDIO - DESIGN SYSTEM TOKENS & STANDARDS
+// =========================================================
+
+// Surface & Background Colors
+$studio-bg-surface: #ffffff;
+$studio-bg-header: #f8fafc;
+$studio-bg-subtle: #f1f5f9;
+$studio-bg-active: #eff6ff;
+$studio-bg-backdrop: rgba(15, 23, 42, 0.6);
+
+// Border Colors
+$studio-border-default: #cbd5e1;
+$studio-border-subtle: #e2e8f0;
+$studio-border-hover: #94a3b8;
+$studio-border-active: #93c5fd;
+
+// Typography & Text Colors
+$studio-text-heading: #1e293b;
+$studio-text-body: #334155;
+$studio-text-muted: #64748b;
+$studio-text-subtle: #94a3b8;
+$studio-text-active: #1d4ed8;
+
+// Primary Accent (Craftsman Blue)
+$studio-accent-primary: #2563eb;
+$studio-accent-hover: #1d4ed8;
+$studio-accent-active: #1e40af;
+
+// Radius
+$studio-radius-sm: 4px;
+$studio-radius-md: 6px;
+$studio-radius-lg: 12px;
+$studio-radius-xl: 16px;
+$studio-radius-full: 9999px;
+
+// Shadows & Elevation
+$studio-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+$studio-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+$studio-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.15);
+
+// Transitions
+$studio-transition-fast: 0.15s ease;
+$studio-transition-normal: 0.2s ease;
+
+// =========================================================
+// COMPATIBILITY ALIASES (3D Studio Components)
+// =========================================================
 $bg-primary: #121214;
 $bg-surface: #1a1a1e;
 $bg-surface-elevated: #24242a;
