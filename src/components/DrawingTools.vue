@@ -6,10 +6,10 @@ import { useSelection } from '../composables/useSelection';
 import { useI18n } from '../composables/useI18n';
 import type { ToolType, RulerType } from '../types/painting';
 import ColorPickerWheel from './ColorPickerWheel.vue';
-import { Pen, Eraser, PaintBucket, Pipette, Lasso, Ruler, Minus, Plus, ChevronDown, FlipHorizontal, FlipVertical } from 'lucide-vue-next';
+import { Pen, Eraser, PaintBucket, Pipette, Lasso, Ruler, Minus, Plus, ChevronDown, FlipHorizontal, FlipVertical, Globe } from 'lucide-vue-next';
 
 const { currentTool, penSize, setTool, setPenSize, penColor, flipHorizontal, flipVertical } = usePainting();
-const { activeRuler, setRuler } = useRulers();
+const { activeRuler, setRuler, isSphericalCurvatureEnabled, toggleSphericalCurvature } = useRulers();
 const { hasSelection, deselect } = useSelection();
 const { t } = useI18n();
 
@@ -131,6 +131,19 @@ function selectRuler(ruler: RulerType) {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- 360 Curvature Toggle (Shown when a ruler is active) -->
+    <div v-if="activeRuler !== 'none'" class="curvature-toggle-wrap">
+      <button
+        class="curvature-btn"
+        :class="{ 'is-active': isSphericalCurvatureEnabled }"
+        :title="isSphericalCurvatureEnabled ? 'Curvatura 360° Activa: Se deforma siguiendo la perspectiva esférica' : 'Modo Plano 2D: Línea recta plana en el mapa sin deformación'"
+        @click="toggleSphericalCurvature()"
+      >
+        <Globe :size="13" />
+        <span>{{ isSphericalCurvatureEnabled ? 'Curvatura: ON' : 'Plano 2D: OFF' }}</span>
+      </button>
     </div>
 
     <!-- Transform / Flip Actions -->
@@ -300,6 +313,39 @@ function selectRuler(ruler: RulerType) {
         font-weight: 700;
       }
     }
+  }
+}
+
+.curvature-toggle-wrap {
+  margin-top: 6px;
+}
+
+.curvature-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #334155;
+  }
+
+  &.is-active {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
   }
 }
 
