@@ -284,30 +284,59 @@ export function usePainting() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // 1. Center curve
-    ctx.beginPath();
-    ctx.moveTo(lastMidX, lastMidY);
-    ctx.quadraticCurveTo(lastX, lastY, midX, midY);
-    ctx.stroke();
+    if (activeRuler.value !== 'none') {
+      // Strict linear path for rulers: 0% wobble
+      // 1. Center line
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(adjustedX, pixelY);
+      ctx.stroke();
 
-    // 2. Left copy (-width)
-    ctx.beginPath();
-    ctx.moveTo(lastMidX - width, lastMidY);
-    ctx.quadraticCurveTo(lastX - width, lastY, midX - width, midY);
-    ctx.stroke();
+      // 2. Left copy (-width)
+      ctx.beginPath();
+      ctx.moveTo(lastX - width, lastY);
+      ctx.lineTo(adjustedX - width, pixelY);
+      ctx.stroke();
 
-    // 3. Right copy (+width)
-    ctx.beginPath();
-    ctx.moveTo(lastMidX + width, lastMidY);
-    ctx.quadraticCurveTo(lastX + width, lastY, midX + width, midY);
-    ctx.stroke();
+      // 3. Right copy (+width)
+      ctx.beginPath();
+      ctx.moveTo(lastX + width, lastY);
+      ctx.lineTo(adjustedX + width, pixelY);
+      ctx.stroke();
 
-    ctx.restore();
+      ctx.restore();
 
-    lastMidX = midX;
-    lastMidY = midY;
-    lastX = adjustedX;
-    lastY = pixelY;
+      lastX = adjustedX;
+      lastY = pixelY;
+      lastMidX = adjustedX;
+      lastMidY = pixelY;
+    } else {
+      // Freehand drawing: Smooth quadratic curve
+      // 1. Center curve
+      ctx.beginPath();
+      ctx.moveTo(lastMidX, lastMidY);
+      ctx.quadraticCurveTo(lastX, lastY, midX, midY);
+      ctx.stroke();
+
+      // 2. Left copy (-width)
+      ctx.beginPath();
+      ctx.moveTo(lastMidX - width, lastMidY);
+      ctx.quadraticCurveTo(lastX - width, lastY, midX - width, midY);
+      ctx.stroke();
+
+      // 3. Right copy (+width)
+      ctx.beginPath();
+      ctx.moveTo(lastMidX + width, lastMidY);
+      ctx.quadraticCurveTo(lastX + width, lastY, midX + width, midY);
+      ctx.stroke();
+
+      ctx.restore();
+
+      lastMidX = midX;
+      lastMidY = midY;
+      lastX = adjustedX;
+      lastY = pixelY;
+    }
 
     // Normalize coordinates into canvas range [0, width)
     if (lastX < 0) {
