@@ -246,6 +246,17 @@ function onPointerMove(e: PointerEvent) {
     return;
   }
 
+  // Screen-space Orthogonal Snap (MediBang style: 0% distortion at any camera angle)
+  if (isInteracting.value && activeRuler.value === 'orthogonal' && strokeAnchor.value && !isSpaceActive.value && !isZActive.value) {
+    const snapped = engine.snapRaycastToScreenOrthogonal(e.clientX, e.clientY, strokeAnchor.value, lockedScreenAxis);
+    if (snapped) {
+      lockedScreenAxis = snapped.lockedAxis;
+      continueStroke(snapped.pixelX, snapped.pixelY);
+      lastPointerPos = { x: e.clientX, y: e.clientY };
+      return;
+    }
+  }
+
   // Normal Drawing Raycast
   const hit = engine.raycastFromClientCoords(e.clientX, e.clientY);
   if (hit) {
@@ -266,8 +277,12 @@ function onPointerMove(e: PointerEvent) {
   lastPointerPos = { x: e.clientX, y: e.clientY };
 }
 
+let lockedScreenAxis: 'x' | 'y' | null = null;
+
 function onPointerUp(e: PointerEvent) {
   if (appMode.value !== '360') return;
+
+  lockedScreenAxis = null;
 
   if (isCtrlAltResizing.value) {
     isCtrlAltResizing.value = false;
