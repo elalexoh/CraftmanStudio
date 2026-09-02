@@ -1,6 +1,6 @@
 export type ToolType = 'pen' | 'eraser' | 'bucket' | 'eyedropper' | 'lasso' | 'ruler_line' | 'ruler_radial';
 
-export type RulerType = 'none' | 'vertical' | 'horizontal' | 'radial' | 'two-point';
+export type RulerType = 'none' | 'vertical' | 'horizontal' | 'radial' | 'two-point' | 'orthogonal';
 
 export type Language = 'es' | 'en' | 'ja';
 

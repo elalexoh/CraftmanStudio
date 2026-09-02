@@ -5,6 +5,7 @@ const activeRuler = ref<RulerType>('none');
 const strokeAnchor = ref<StrokePoint | null>(null);
 const linePreviewEnd = ref<StrokePoint | null>(null);
 const isSphericalCurvatureEnabled = ref<boolean>(true);
+let lockedOrthogonalAxis: 'x' | 'y' | null = null;
 
 // Radial (Vanishing Point) Center
 const radialCenter = ref<StrokePoint>({ x: 2048, y: 1024 });
@@ -14,6 +15,7 @@ export function useRulers() {
     activeRuler.value = ruler;
     strokeAnchor.value = null;
     linePreviewEnd.value = null;
+    lockedOrthogonalAxis = null;
   }
 
   function toggleSphericalCurvature(val?: boolean) {
@@ -27,6 +29,7 @@ export function useRulers() {
   function resetStrokeAnchor() {
     strokeAnchor.value = null;
     linePreviewEnd.value = null;
+    lockedOrthogonalAxis = null;
   }
 
   function setLinePreviewEnd(pt: StrokePoint | null) {
@@ -85,6 +88,35 @@ export function useRulers() {
     // 4. Two-Point Straight Line Ruler
     if (activeRuler.value === 'two-point') {
       return { x: rawX, y: rawY };
+    }
+
+    // 5. Orthogonal Ruler (Auto H/V MediBang style):
+    if (activeRuler.value === 'orthogonal') {
+      const anchor = strokeAnchor.value || { x: rawX, y: rawY };
+      const dx = rawX - anchor.x;
+      const dy = rawY - anchor.y;
+
+      if (!lockedOrthogonalAxis) {
+        if (Math.hypot(dx, dy) >= 2) {
+          lockedOrthogonalAxis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+        } else {
+          return { x: Math.round(anchor.x), y: Math.round(anchor.y) };
+        }
+      }
+
+      if (lockedOrthogonalAxis === 'x') {
+        // Pure Horizontal movement (lock Y to anchor.y)
+        return {
+          x: Math.round(rawX),
+          y: Math.round(anchor.y)
+        };
+      } else {
+        // Pure Vertical movement (lock X to anchor.x)
+        return {
+          x: Math.round(anchor.x),
+          y: Math.round(rawY)
+        };
+      }
     }
 
     return { x: rawX, y: rawY };

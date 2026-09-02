@@ -258,6 +258,8 @@ export function useHotkeys() {
 
     if (matchesBinding('toolRuler', eventKeyStr, rawKey)) {
       const nextRuler = activeRuler.value === 'none'
+        ? 'orthogonal'
+        : activeRuler.value === 'orthogonal'
         ? 'two-point'
         : activeRuler.value === 'two-point'
         ? 'vertical'

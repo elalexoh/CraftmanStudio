@@ -356,6 +356,33 @@ export class PanoramicEngine {
       return;
     }
 
+    if (rulerType === 'orthogonal') {
+      if (anchor) {
+        // Draw vertical guide through anchor
+        const ptsV: THREE.Vector3[] = [];
+        for (let i = 0; i <= 48; i++) {
+          const y = (i / 48) * h;
+          ptsV.push(pixelToSphere(anchor.x, y));
+        }
+        const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
+        const lineV = new THREE.Line(geomV, lineMaterial);
+        lineV.renderOrder = 20;
+        this.rulerGuideGroup.add(lineV);
+
+        // Draw horizontal guide through anchor
+        const ptsH: THREE.Vector3[] = [];
+        for (let i = 0; i <= 64; i++) {
+          const x = (i / 64) * w;
+          ptsH.push(pixelToSphere(x, anchor.y));
+        }
+        const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
+        const lineH = new THREE.LineLoop(geomH, lineMaterial);
+        lineH.renderOrder = 20;
+        this.rulerGuideGroup.add(lineH);
+      }
+      return;
+    }
+
     if (rulerType === 'vertical') {
       // If stroke anchor is active, draw primary active meridian line
       if (anchor) {

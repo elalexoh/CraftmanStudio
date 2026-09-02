@@ -108,7 +108,7 @@ function selectRuler(ruler: RulerType) {
           @click="showRulerMenu = !showRulerMenu"
         >
           <Ruler :size="16" />
-          <span>{{ activeRuler === 'none' ? (t('ruler') || 'Regla') : activeRuler === 'two-point' ? 'Línea 2P' : activeRuler === 'vertical' ? 'Vertical' : activeRuler === 'horizontal' ? 'Horizontal' : 'Radial' }}</span>
+          <span>{{ activeRuler === 'none' ? (t('ruler') || 'Regla') : activeRuler === 'orthogonal' ? 'Ortogonal' : activeRuler === 'two-point' ? 'Línea 2P' : activeRuler === 'vertical' ? 'Vertical' : activeRuler === 'horizontal' ? 'Horizontal' : 'Radial' }}</span>
           <ChevronDown :size="11" class="arrow-icon" />
         </button>
 
@@ -121,6 +121,14 @@ function selectRuler(ruler: RulerType) {
           >
             <span>Desactivada</span>
             <Check v-if="activeRuler === 'none'" :size="12" class="check-icon" />
+          </button>
+          <button
+            class="ruler-menu-item"
+            :class="{ selected: activeRuler === 'orthogonal' }"
+            @click="selectRuler('orthogonal')"
+          >
+            <span>➕ Regla Ortogonal (H / V Auto)</span>
+            <Check v-if="activeRuler === 'orthogonal'" :size="12" class="check-icon" />
           </button>
           <button
             class="ruler-menu-item"
