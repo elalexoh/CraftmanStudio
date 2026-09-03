@@ -692,14 +692,20 @@ export class PanoramicEngine {
     this.onTransitionComplete = onComplete;
     this.isTransitioning = true;
   }
-
+  private notifyRotationScheduled: boolean = false;
   private notifyCameraRotation() {
-    if (this.onCameraRotated) {
-      const yDeg = ((THREE.MathUtils.radToDeg(this.yaw) % 360) + 360) % 360;
-      const pDeg = THREE.MathUtils.radToDeg(this.pitch);
-      const rDeg = THREE.MathUtils.radToDeg(this.roll);
-      this.onCameraRotated(yDeg, pDeg, rDeg);
-    }
+    if (!this.onCameraRotated) return;
+    if (this.notifyRotationScheduled) return;
+    this.notifyRotationScheduled = true;
+    requestAnimationFrame(() => {
+      this.notifyRotationScheduled = false;
+      if (this.onCameraRotated) {
+        const yDeg = ((THREE.MathUtils.radToDeg(this.yaw) % 360) + 360) % 360;
+        const pDeg = THREE.MathUtils.radToDeg(this.pitch);
+        const rDeg = THREE.MathUtils.radToDeg(this.roll);
+        this.onCameraRotated(yDeg, pDeg, rDeg);
+      }
+    });
   }
 
   public zoomFov(deltaFov: number) {
@@ -885,10 +891,10 @@ export class PanoramicEngine {
         this.roll = this.startRoll + (this.targetRoll - this.startRoll) * ease;
 
         this.updateCameraDirection();
-        this.notifyCameraRotation();
 
         if (progress >= 1.0) {
           this.isTransitioning = false;
+          this.notifyCameraRotation();
           if (this.onTransitionComplete) {
             this.onTransitionComplete();
             this.onTransitionComplete = undefined;

@@ -74,10 +74,23 @@ export function useCameraPresets() {
 
   // Llamado desde el motor 3D cuando el usuario orbita manualmente
   const syncFromEngine = (yawDeg: number, pitchDeg: number, rollDeg: number = 0) => {
-    orientation.yaw = ((yawDeg % 360) + 360) % 360;
-    orientation.pitch = Math.max(-89.9, Math.min(89.9, pitchDeg));
-    orientation.roll = Math.max(-180, Math.min(180, rollDeg));
-    // Comprobar si coincide exactamente con un preset
+    const newYaw = ((yawDeg % 360) + 360) % 360;
+    const newPitch = Math.max(-89.9, Math.min(89.9, pitchDeg));
+    const newRoll = Math.max(-180, Math.min(180, rollDeg));
+
+    // Evitar disparar reactividad en Vue si el cambio es inferior a 0.25 grados
+    if (
+      Math.abs(orientation.yaw - newYaw) < 0.25 &&
+      Math.abs(orientation.pitch - newPitch) < 0.25 &&
+      Math.abs(orientation.roll - newRoll) < 0.25
+    ) {
+      return;
+    }
+
+    orientation.yaw = newYaw;
+    orientation.pitch = newPitch;
+    orientation.roll = newRoll;
+
     let matched: AxonometricPreset = 'free';
     for (const [key, val] of Object.entries(PRESET_CONFIGS)) {
       if (val && Math.abs(val.yaw - orientation.yaw) < 0.5 && Math.abs(val.pitch - orientation.pitch) < 0.5) {
@@ -85,7 +98,9 @@ export function useCameraPresets() {
         break;
       }
     }
-    currentPreset.value = matched;
+    if (currentPreset.value !== matched) {
+      currentPreset.value = matched;
+    }
   };
 
   const saveBookmark = (slotId: number) => {
