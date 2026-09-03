@@ -282,8 +282,8 @@ function onPointerMove(e: PointerEvent) {
   }
 
   // Screen-space Orthogonal Snap (MediBang style: 0% distortion at any camera angle)
-  if (isInteracting.value && activeRuler.value === 'orthogonal' && strokeAnchor.value && !isSpaceActive.value && !isZActive.value) {
-    const snapped = engine.snapRaycastToScreenOrthogonal(e.clientX, e.clientY, strokeAnchor.value, lockedScreenAxis);
+  if (isInteracting.value && activeRuler.value !== 'none' && strokeAnchor.value && !isSpaceActive.value && !isZActive.value) {
+    const snapped = engine.snapRaycastToScreenOrthogonal(e.clientX, e.clientY, strokeAnchor.value, lockedScreenAxis, activeRuler.value);
     if (snapped) {
       lockedScreenAxis = snapped.lockedAxis;
       continueStroke(snapped.pixelX, snapped.pixelY);

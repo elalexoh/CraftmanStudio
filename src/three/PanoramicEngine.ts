@@ -417,7 +417,7 @@ export class PanoramicEngine {
       this.rulerGuideGroup.remove(obj);
     }
 
-    if (rulerType !== 'orthogonal' || !this.masterCanvas || !anchor) {
+    if (rulerType === 'none' || !this.masterCanvas || !anchor) {
       return;
     }
 
@@ -441,38 +441,45 @@ export class PanoramicEngine {
     const anchor3D = pixelToSphere(anchor.x, anchor.y);
     const anchorNDC = anchor3D.clone().project(this.camera);
 
+    const showH = rulerType === 'orthogonal' || rulerType === 'horizontal';
+    const showV = rulerType === 'orthogonal' || rulerType === 'vertical';
+
     // 1. Screen Horizontal guide line (fixed y = anchorNDC.y)
-    const ptsH: THREE.Vector3[] = [];
-    for (let i = 0; i <= 24; i++) {
-      const ndcX = -1 + (i / 24) * 2;
-      const dir = new THREE.Vector3(ndcX, anchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-      const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
-      if (hit) {
-        ptsH.push(hit.point);
+    if (showH) {
+      const ptsH: THREE.Vector3[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const ndcX = -1 + (i / 24) * 2;
+        const dir = new THREE.Vector3(ndcX, anchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+        const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
+        if (hit) {
+          ptsH.push(hit.point);
+        }
       }
-    }
-    if (ptsH.length > 1) {
-      const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
-      const lineH = new THREE.Line(geomH, lineMaterial);
-      lineH.renderOrder = 20;
-      this.rulerGuideGroup.add(lineH);
+      if (ptsH.length > 1) {
+        const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
+        const lineH = new THREE.Line(geomH, lineMaterial);
+        lineH.renderOrder = 20;
+        this.rulerGuideGroup.add(lineH);
+      }
     }
 
     // 2. Screen Vertical guide line (fixed x = anchorNDC.x)
-    const ptsV: THREE.Vector3[] = [];
-    for (let i = 0; i <= 24; i++) {
-      const ndcY = -1 + (i / 24) * 2;
-      const dir = new THREE.Vector3(anchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-      const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
-      if (hit) {
-        ptsV.push(hit.point);
+    if (showV) {
+      const ptsV: THREE.Vector3[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const ndcY = -1 + (i / 24) * 2;
+        const dir = new THREE.Vector3(anchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+        const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
+        if (hit) {
+          ptsV.push(hit.point);
+        }
       }
-    }
-    if (ptsV.length > 1) {
-      const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
-      const lineV = new THREE.Line(geomV, lineMaterial);
-      lineV.renderOrder = 20;
-      this.rulerGuideGroup.add(lineV);
+      if (ptsV.length > 1) {
+        const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
+        const lineV = new THREE.Line(geomV, lineMaterial);
+        lineV.renderOrder = 20;
+        this.rulerGuideGroup.add(lineV);
+      }
     }
   }
 
@@ -802,7 +809,8 @@ export class PanoramicEngine {
     clientX: number,
     clientY: number,
     anchorPixel: { x: number; y: number },
-    currentLockedAxis: 'x' | 'y' | null
+    currentLockedAxis: 'x' | 'y' | null,
+    rulerMode: string = 'orthogonal'
   ): { pixelX: number; pixelY: number; lockedAxis: 'x' | 'y' } | null {
     const canvasWidth = this.masterCanvas ? this.masterCanvas.width : 4096;
     const canvasHeight = this.masterCanvas ? this.masterCanvas.height : 2048;
@@ -831,7 +839,11 @@ export class PanoramicEngine {
     const deltaPxY = clientY - anchorScreenY;
 
     let axis = currentLockedAxis;
-    if (!axis) {
+    if (rulerMode === 'horizontal') {
+      axis = 'x';
+    } else if (rulerMode === 'vertical') {
+      axis = 'y';
+    } else if (!axis) {
       const dist = Math.hypot(deltaPxX, deltaPxY);
       if (dist >= 6) {
         // Perfect 1:1 symmetric 45-degree angle test

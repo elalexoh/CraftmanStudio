@@ -28,7 +28,9 @@ export const defaultHotkeys: HotkeyBinding[] = [
   { id: 'toolBucket', category: 'tools', labelKey: 'helpBucket', defaultKeys: ['g', '3'], currentKeys: ['g', '3'] },
   { id: 'toolEyedropper', category: 'tools', labelKey: 'helpEyedropper', defaultKeys: ['i', '4'], currentKeys: ['i', '4'] },
   { id: 'toolLasso', category: 'tools', labelKey: 'lasso', defaultKeys: ['l', '5'], currentKeys: ['l', '5'] },
-  { id: 'toolRuler', category: 'tools', labelKey: 'ruler', defaultKeys: ['r'], currentKeys: ['r'] },
+  { id: 'toolRuler', category: 'tools', labelKey: 'rulerOrthogonal', defaultKeys: ['r'], currentKeys: ['r'] },
+  { id: 'toolRulerHorizontal', category: 'tools', labelKey: 'rulerHorizontal', defaultKeys: ['Shift+h', 'Alt+h'], currentKeys: ['Shift+h', 'Alt+h'] },
+  { id: 'toolRulerVertical', category: 'tools', labelKey: 'rulerVertical', defaultKeys: ['Shift+v', 'Alt+v'], currentKeys: ['Shift+v', 'Alt+v'] },
   { id: 'eyedropperHold', category: 'tools', labelKey: 'eyedropperHold', defaultKeys: ['Alt'], currentKeys: ['Alt'] },
 
   // Selection & Layers
@@ -286,10 +288,28 @@ export function useHotkeys() {
       return;
     }
 
+    const { activeRuler, setRuler, cycleRuler, toggleRulerMode } = useRulers();
+
+    if (matchesBinding('toolRulerHorizontal', eventKeyStr, rawKey)) {
+      e.preventDefault();
+      const nextMode = toggleRulerMode('horizontal');
+      showZenToast(nextMode === 'horizontal' ? 'Regla: Solo Horizontal (H) Activada' : 'Regla Desactivada');
+      return;
+    }
+
+    if (matchesBinding('toolRulerVertical', eventKeyStr, rawKey)) {
+      e.preventDefault();
+      const nextMode = toggleRulerMode('vertical');
+      showZenToast(nextMode === 'vertical' ? 'Regla: Solo Vertical (V) Activada' : 'Regla Desactivada');
+      return;
+    }
+
     if (matchesBinding('toolRuler', eventKeyStr, rawKey)) {
-      const nextRuler = activeRuler.value === 'orthogonal' ? 'none' : 'orthogonal';
-      setRuler(nextRuler);
-      if (isZenMode.value) showZenToast(nextRuler === 'orthogonal' ? 'Regla H/V Activada' : 'Regla Desactivada');
+      const nextRuler = cycleRuler();
+      if (nextRuler === 'orthogonal') showZenToast('Regla: Ortogonal H / V (Auto)');
+      else if (nextRuler === 'horizontal') showZenToast('Regla: Solo Horizontal (H)');
+      else if (nextRuler === 'vertical') showZenToast('Regla: Solo Vertical (V)');
+      else showZenToast('Regla Desactivada');
       return;
     }
 

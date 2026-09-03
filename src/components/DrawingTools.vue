@@ -19,7 +19,7 @@ import {
 } from 'lucide-vue-next';
 
 const { currentTool, penSize, setTool, setPenSize, flipHorizontal, flipVertical } = usePainting();
-const { activeRuler, setRuler } = useRulers();
+const { activeRuler, setRuler, cycleRuler } = useRulers();
 const { isPresetsPanelOpen, togglePresetsPanel } = useCameraPresets();
 const { t } = useI18n();
 
@@ -87,15 +87,31 @@ function adjustSize(delta: number) {
         <span>{{ t('lasso') || 'Lazo' }}</span>
       </button>
 
-      <!-- Orthogonal Ruler Toggle Button -->
+      <!-- Ruler Toggle / Cycle Button (H / V / Orthogonal) -->
       <button
         class="tool-btn"
-        :class="{ active: activeRuler === 'orthogonal' }"
-        :title="activeRuler === 'orthogonal' ? 'Regla Ortogonal: Activa (H / V)' : 'Activar Regla Ortogonal (H / V)'"
-        @click="setRuler(activeRuler === 'orthogonal' ? 'none' : 'orthogonal')"
+        :class="{ active: activeRuler !== 'none' }"
+        :title="
+          activeRuler === 'orthogonal'
+            ? 'Regla Ortogonal: H / V (Clic para Solo H)'
+            : activeRuler === 'horizontal'
+            ? 'Regla: Solo Horizontal (Clic para Solo V)'
+            : activeRuler === 'vertical'
+            ? 'Regla: Solo Vertical (Clic para Desactivar)'
+            : 'Activar Regla (R / Shift+H / Shift+V)'
+        "
+        @click="cycleRuler"
       >
         <Ruler :size="16" />
-        <span>{{ activeRuler === 'orthogonal' ? 'Ortogonal: ON' : 'Ortogonal' }}</span>
+        <span>{{
+          activeRuler === 'orthogonal'
+            ? 'Regla: H/V'
+            : activeRuler === 'horizontal'
+            ? 'Solo H'
+            : activeRuler === 'vertical'
+            ? 'Solo V'
+            : 'Regla'
+        }}</span>
       </button>
     </div>
 

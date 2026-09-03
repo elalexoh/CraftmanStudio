@@ -10,6 +10,24 @@ export function useRulers() {
     strokeAnchor.value = null;
   }
 
+  function cycleRuler(): RulerType {
+    const next: Record<RulerType, RulerType> = {
+      none: 'orthogonal',
+      orthogonal: 'horizontal',
+      horizontal: 'vertical',
+      vertical: 'none',
+    };
+    const nextMode = next[activeRuler.value] || 'none';
+    setRuler(nextMode);
+    return nextMode;
+  }
+
+  function toggleRulerMode(mode: 'orthogonal' | 'horizontal' | 'vertical'): RulerType {
+    const nextMode = activeRuler.value === mode ? 'none' : mode;
+    setRuler(nextMode);
+    return nextMode;
+  }
+
   function setStrokeAnchor(x: number, y: number) {
     strokeAnchor.value = { x, y };
   }
@@ -26,6 +44,8 @@ export function useRulers() {
     activeRuler: computed(() => activeRuler.value),
     strokeAnchor: computed(() => strokeAnchor.value),
     setRuler,
+    cycleRuler,
+    toggleRulerMode,
     setStrokeAnchor,
     resetStrokeAnchor,
     snapPoint
