@@ -1,3 +1,4 @@
+<script setup lang="ts">
 import { usePainting } from '../composables/usePainting';
 import { useRulers } from '../composables/useRulers';
 import { useCameraPresets } from '../composables/useCameraPresets';
