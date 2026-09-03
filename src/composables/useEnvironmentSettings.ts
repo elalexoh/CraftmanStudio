@@ -8,6 +8,7 @@ export interface ColorPreset {
 }
 
 export const BG_COLOR_PRESETS: ColorPreset[] = [
+  { label: 'MediBang Gris', value: '#cfcbcb' },
   { label: 'Cielo Claro', value: '#f1f5f9' },
   { label: 'Estudio Oscuro', value: '#18181b' },
   { label: 'Gris Neutro', value: '#64748b' },
@@ -17,6 +18,7 @@ export const BG_COLOR_PRESETS: ColorPreset[] = [
 ];
 
 export const GRID_COLOR_PRESETS: ColorPreset[] = [
+  { label: 'Negro MediBang', value: '#000000' },
   { label: 'Cian Guía', value: '#06b6d4' },
   { label: 'Azul Técnico', value: '#2563eb' },
   { label: 'Gris Grafito', value: '#475569' },
@@ -34,9 +36,9 @@ export const GRID_MODE_OPTIONS: { id: GridMode; label: string; desc: string }[] 
   { id: 'polar', label: 'Polar Concéntrica', desc: 'Anillos concéntricos y rayos radiales' },
 ];
 
-const backgroundColor = ref('#f1f5f9');
-const gridColor = ref('#06b6d4');
-const gridOpacity = ref(0.4);
+const backgroundColor = ref('#cfcbcb');
+const gridColor = ref('#000000');
+const gridOpacity = ref(0.20);
 const gridMode = ref<GridMode>('standard');
 
 type EnvCallback = (settings: {

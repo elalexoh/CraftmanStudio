@@ -50,7 +50,7 @@ export class PanoramicEngine {
   constructor(container: HTMLElement) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf1f5f9); // Light clean sky background
+    this.scene.background = new THREE.Color(0xcfcbcb); // MediBang neutral canvas background
 
     this.raycaster = new THREE.Raycaster();
 
@@ -63,7 +63,7 @@ export class PanoramicEngine {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0xf1f5f9, 1.0);
+    this.renderer.setClearColor(0xcfcbcb, 1.0);
     this.container.appendChild(this.renderer.domElement);
 
     // Sphere with BackSide for 360 Equirectangular Projection
@@ -196,8 +196,8 @@ export class PanoramicEngine {
       uniforms: {
         gridSize: { value: Math.sqrt(this.eyeHeight / 1.5) },
         gridType: { value: 0 },
-        gridColor: { value: new THREE.Color(0x06b6d4) },
-        gridOpacity: { value: 0.4 }
+        gridColor: { value: new THREE.Color(0x000000) },
+        gridOpacity: { value: 0.20 }
       },
       transparent: true,
       depthTest: false,
@@ -255,9 +255,9 @@ export class PanoramicEngine {
 
     const verticalGuideGeometry = new THREE.BufferGeometry().setFromPoints(verticalGuidePoints);
     const verticalGuideMaterial = new THREE.LineBasicMaterial({
-      color: 0x6699ff,
+      color: 0x000000,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.10,
       depthTest: false,
       depthWrite: false
     });
@@ -278,9 +278,9 @@ export class PanoramicEngine {
     }
     const ringGeometry = new THREE.BufferGeometry().setFromPoints(ringPoints);
     const ringMaterial = new THREE.LineBasicMaterial({
-      color: 0x3b82f6,
+      color: 0x000000,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.25,
       depthTest: false,
       depthWrite: false
     });
