@@ -4,6 +4,7 @@ import {
   useCameraPresets,
   type AxonometricPreset,
 } from '../composables/useCameraPresets';
+import { useAppState } from '../composables/useAppState';
 import {
   useEnvironmentSettings,
   BG_COLOR_PRESETS,
@@ -22,7 +23,8 @@ import {
   Grid,
   Palette,
   Eye,
-  Sliders
+  Sliders,
+  ArrowUpDown
 } from 'lucide-vue-next';
 
 const {
@@ -36,6 +38,8 @@ const {
   loadBookmark,
   setPresetsPanelOpen,
 } = useCameraPresets();
+
+const { eyeHeight, setEyeHeight, adjustEyeHeight } = useAppState();
 
 const {
   backgroundColor,
@@ -60,6 +64,14 @@ const presetsList: { id: AxonometricPreset; label: string; desc: string }[] = [
   { id: 'cavalier', label: 'Caballera', desc: 'Frontal 90°, oblicuo -30°' },
   { id: 'military', label: 'Militar', desc: 'Planta a 45°, cenital a -45°' },
   { id: 'free', label: 'Modo Libre', desc: 'Órbita y orientación continua' },
+];
+
+const heightPresets = [
+  { label: 'Suelo (0.5m)', val: 0.5 },
+  { label: 'Humano (1.6m)', val: 1.6 },
+  { label: 'Cenital (5m)', val: 5.0 },
+  { label: 'Aéreo (15m)', val: 15.0 },
+  { label: 'Pájaro (30m)', val: 30.0 },
 ];
 
 const handleYawChange = (val: number | string) => {
@@ -94,11 +106,15 @@ const stepAngle = (axis: 'yaw' | 'pitch' | 'roll', delta: number) => {
 };
 
 const handleSaveSlot = (slotId: number) => {
-  saveBookmark(slotId);
+  saveBookmark(slotId, eyeHeight.value);
   savedSlotId.value = slotId;
   setTimeout(() => {
     savedSlotId.value = null;
   }, 1200);
+};
+
+const handleLoadSlot = (slotId: number) => {
+  loadBookmark(slotId, (height) => setEyeHeight(height));
 };
 </script>
 
@@ -275,7 +291,60 @@ const handleSaveSlot = (slotId: number) => {
 
         <div class="panel-divider"></div>
 
-        <!-- Section 3: Bookmarks -->
+        <!-- Section 3: Elevación de Cámara (Altura de Vista) -->
+        <div class="section-group">
+          <div class="section-header-row">
+            <label class="section-label">Elevación de Cámara (Altura)</label>
+            <span class="section-hint">{{ eyeHeight.toFixed(1) }}m</span>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label-row">
+              <span class="axis-title">Altura del Suelo:</span>
+              <div class="stepper-box">
+                <button class="step-btn" title="-0.5m" @click="adjustEyeHeight(-0.5)">-0.5m</button>
+                <input
+                  type="number"
+                  class="num-input height-input"
+                  step="0.1"
+                  min="0.5"
+                  max="30"
+                  :value="eyeHeight"
+                  @input="setEyeHeight(Number(($event.target as HTMLInputElement).value))"
+                />
+                <span class="unit-symbol">m</span>
+                <button class="step-btn" title="+0.5m" @click="adjustEyeHeight(0.5)">+0.5m</button>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="30"
+              step="0.1"
+              class="angle-slider"
+              :value="eyeHeight"
+              @input="setEyeHeight(Number(($event.target as HTMLInputElement).value))"
+            />
+          </div>
+
+          <!-- Quick chips for elevation -->
+          <div class="height-chips-row">
+            <button
+              v-for="hp in heightPresets"
+              :key="hp.val"
+              class="height-chip-btn"
+              :class="{ active: Math.abs(eyeHeight - hp.val) < 0.15 }"
+              :title="`Ajustar altura a ${hp.val}m`"
+              @click="setEyeHeight(hp.val)"
+            >
+              {{ hp.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Section 4: Bookmarks -->
         <div class="section-group">
           <div class="section-header-row">
             <label class="section-label">Bookmarks de Cámara</label>
@@ -286,8 +355,8 @@ const handleSaveSlot = (slotId: number) => {
               <button
                 class="bookmark-load-btn"
                 :class="{ saved: savedSlotId === b.id }"
-                :title="`Cargar Vista ${b.id} (${b.preset})`"
-                @click="loadBookmark(b.id)"
+                :title="`Cargar Vista ${b.id} (${b.preset})${b.eyeHeight ? ' - ' + b.eyeHeight.toFixed(1) + 'm' : ''}`"
+                @click="handleLoadSlot(b.id)"
               >
                 <span v-if="savedSlotId === b.id" class="saved-feedback">
                   <Check :size="12" />
@@ -668,6 +737,41 @@ const handleSaveSlot = (slotId: number) => {
 .unit-symbol {
   font-size: 10px;
   color: #94a3b8;
+}
+
+.num-input.height-input {
+  width: 48px;
+}
+
+.height-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.height-chip-btn {
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  &.active {
+    background: #eff6ff;
+    border-color: #2563eb;
+    color: #2563eb;
+    font-weight: 700;
+  }
 }
 
 .angle-slider {
