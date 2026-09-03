@@ -25,8 +25,21 @@ export class PanoramicEngine {
   // Camera angles (in radians)
   public yaw: number = 0; // horizontal angle
   public pitch: number = 0; // vertical angle
+  public roll: number = 0; // roll angle
   public eyeHeight: number = 1.5; // in meters
   public showGroundGrid: boolean = true;
+  public onCameraRotated?: (yawDeg: number, pitchDeg: number, rollDeg: number) => void;
+
+  private targetYaw: number = 0;
+  private targetPitch: number = 0;
+  private targetRoll: number = 0;
+  private isTransitioning: boolean = false;
+  private transitionStart: number = 0;
+  private transitionDuration: number = 300;
+  private startYaw: number = 0;
+  private startPitch: number = 0;
+  private startRoll: number = 0;
+  private onTransitionComplete?: () => void;
 
   // Eraser indicator
   private eraserCursorMesh: THREE.LineLoop | null = null;
@@ -120,19 +133,45 @@ export class PanoramicEngine {
     const fragmentShader = `
       varying vec3 vWorldPosition;
       uniform float gridSize;
+      uniform int gridType; // 0: standard, 1: isometric, 2: axonometric 45deg
       void main() {
-        vec2 gridPosition = vWorldPosition.xz / gridSize;
-        vec2 gridDistance = abs(fract(gridPosition - 0.5) - 0.5) / fwidth(gridPosition);
-        float line = 1.0 - min(min(gridDistance.x, gridDistance.y), 1.0);
+        vec2 p = vWorldPosition.xz / gridSize;
+        float line = 0.0;
+
+        if (gridType == 1) {
+          // Isometric 3-axis grid (0 deg, 60 deg, 120 deg)
+          mat2 rot60 = mat2(0.5, -0.866025, 0.866025, 0.5);
+          mat2 rot120 = mat2(-0.5, -0.866025, 0.866025, -0.5);
+          vec2 p2 = rot60 * p;
+          vec2 p3 = rot120 * p;
+
+          float d1 = abs(fract(p.y - 0.5) - 0.5) / fwidth(p.y);
+          float d2 = abs(fract(p2.y - 0.5) - 0.5) / fwidth(p2.y);
+          float d3 = abs(fract(p3.y - 0.5) - 0.5) / fwidth(p3.y);
+
+          line = max(max(1.0 - min(d1, 1.0), 1.0 - min(d2, 1.0)), 1.0 - min(d3, 1.0));
+        } else if (gridType == 2) {
+          // 45 degree diamond grid
+          mat2 rot45 = mat2(0.707106, -0.707106, 0.707106, 0.707106);
+          vec2 p45 = rot45 * p;
+          vec2 d = abs(fract(p45 - 0.5) - 0.5) / fwidth(p45);
+          line = 1.0 - min(min(d.x, d.y), 1.0);
+        } else {
+          // Standard cartesian grid
+          vec2 d = abs(fract(p - 0.5) - 0.5) / fwidth(p);
+          line = 1.0 - min(min(d.x, d.y), 1.0);
+        }
+
         vec3 gridColor = vec3(0.25, 0.55, 1.0);
-        gl_FragColor = vec4(gridColor, line * 0.35);
+        gl_FragColor = vec4(gridColor, line * 0.38);
       }
     `;
 
     // 1. Infinite Ground Grid at y = 0
     this.groundGridMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        gridSize: { value: Math.sqrt(this.eyeHeight / 1.5) }
+        gridSize: { value: Math.sqrt(this.eyeHeight / 1.5) },
+        gridType: { value: 0 }
       },
       transparent: true,
       depthTest: false,
@@ -245,6 +284,15 @@ export class PanoramicEngine {
     if (this.horizontalGridMesh) this.horizontalGridMesh.visible = show;
     if (this.verticalGuidesMesh) this.verticalGuidesMesh.visible = show;
     if (this.horizonGuide) this.horizonGuide.visible = show;
+  }
+
+  public setGridType(type: 'standard' | 'isometric' | 'axonometric') {
+    let val = 0;
+    if (type === 'isometric') val = 1;
+    else if (type === 'axonometric') val = 2;
+    if (this.groundGridMaterial) {
+      this.groundGridMaterial.uniforms.gridType.value = val;
+    }
   }
 
   private setupEraserCursor() {
@@ -521,12 +569,72 @@ export class PanoramicEngine {
   }
 
   public rotateCamera(deltaYaw: number, deltaPitch: number) {
+    this.rotateCameraWithSnap(deltaYaw, deltaPitch, false);
+  }
+
+  public rotateCameraWithSnap(deltaYaw: number, deltaPitch: number, isSnap: boolean = false) {
+    this.isTransitioning = false;
     this.yaw += deltaYaw;
     this.yaw = (this.yaw % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
 
     const maxPitch = (Math.PI / 2) - 0.02;
     this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch + deltaPitch));
+
+    if (isSnap) {
+      const snapStep = (15 * Math.PI) / 180; // 15 degrees snap
+      this.yaw = Math.round(this.yaw / snapStep) * snapStep;
+      this.pitch = Math.round(this.pitch / snapStep) * snapStep;
+    }
+
     this.updateCameraDirection();
+    this.notifyCameraRotation();
+  }
+
+  public setOrientationDeg(yawDeg: number, pitchDeg: number, rollDeg: number = 0) {
+    this.isTransitioning = false;
+    this.yaw = THREE.MathUtils.degToRad(((yawDeg % 360) + 360) % 360);
+    const clampedPitch = Math.max(-89.0, Math.min(89.0, pitchDeg));
+    this.pitch = THREE.MathUtils.degToRad(clampedPitch);
+    this.roll = THREE.MathUtils.degToRad(rollDeg);
+    this.updateCameraDirection();
+    this.notifyCameraRotation();
+  }
+
+  public animateToOrientationDeg(
+    targetYawDeg: number,
+    targetPitchDeg: number,
+    targetRollDeg: number = 0,
+    durationMs: number = 300,
+    onComplete?: () => void
+  ) {
+    this.startYaw = this.yaw;
+    this.startPitch = this.pitch;
+    this.startRoll = this.roll;
+
+    let targetY = THREE.MathUtils.degToRad(((targetYawDeg % 360) + 360) % 360);
+    // Find shortest angular path for yaw
+    let diff = targetY - this.startYaw;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    this.targetYaw = this.startYaw + diff;
+
+    const clampedPitch = Math.max(-89.0, Math.min(89.0, targetPitchDeg));
+    this.targetPitch = THREE.MathUtils.degToRad(clampedPitch);
+    this.targetRoll = THREE.MathUtils.degToRad(targetRollDeg);
+
+    this.transitionStart = performance.now();
+    this.transitionDuration = Math.max(50, durationMs);
+    this.onTransitionComplete = onComplete;
+    this.isTransitioning = true;
+  }
+
+  private notifyCameraRotation() {
+    if (this.onCameraRotated) {
+      const yDeg = ((THREE.MathUtils.radToDeg(this.yaw) % 360) + 360) % 360;
+      const pDeg = THREE.MathUtils.radToDeg(this.pitch);
+      const rDeg = THREE.MathUtils.radToDeg(this.roll);
+      this.onCameraRotated(yDeg, pDeg, rDeg);
+    }
   }
 
   public zoomFov(deltaFov: number) {
@@ -540,16 +648,29 @@ export class PanoramicEngine {
     const cosYaw = Math.cos(this.yaw);
     const sinYaw = Math.sin(this.yaw);
 
-    const target = new THREE.Vector3(
+    const forward = new THREE.Vector3(
       cosPitch * sinYaw,
       sinPitch,
       -cosPitch * cosYaw
-    );
+    ).normalize();
 
+    // Standard up vector before roll
+    let right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+    if (right.lengthSq() < 0.0001) {
+      right = new THREE.Vector3(1, 0, 0);
+    } else {
+      right.normalize();
+    }
+    const upBase = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+    // Apply roll around forward axis
+    const up = upBase.clone().multiplyScalar(Math.cos(this.roll)).add(right.clone().multiplyScalar(Math.sin(this.roll)));
+
+    this.camera.up.copy(up);
     this.camera.lookAt(
-      this.camera.position.x + target.x,
-      this.camera.position.y + target.y,
-      this.camera.position.z + target.z
+      this.camera.position.x + forward.x,
+      this.camera.position.y + forward.y,
+      this.camera.position.z + forward.z
     );
   }
 
@@ -685,6 +806,30 @@ export class PanoramicEngine {
   private startRenderLoop() {
     const render = () => {
       this.animationFrameId = requestAnimationFrame(render);
+      if (this.isTransitioning) {
+        const now = performance.now();
+        const elapsed = now - this.transitionStart;
+        const progress = Math.min(1.0, elapsed / this.transitionDuration);
+        // Smooth cubic easeInOut
+        const ease = progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+        this.yaw = this.startYaw + (this.targetYaw - this.startYaw) * ease;
+        this.pitch = this.startPitch + (this.targetPitch - this.startPitch) * ease;
+        this.roll = this.startRoll + (this.targetRoll - this.startRoll) * ease;
+
+        this.updateCameraDirection();
+        this.notifyCameraRotation();
+
+        if (progress >= 1.0) {
+          this.isTransitioning = false;
+          if (this.onTransitionComplete) {
+            this.onTransitionComplete();
+            this.onTransitionComplete = undefined;
+          }
+        }
+      }
       this.renderer.render(this.scene, this.camera);
     };
     render();

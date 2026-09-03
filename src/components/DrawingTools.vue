@@ -1,6 +1,6 @@
-<script setup lang="ts">
 import { usePainting } from '../composables/usePainting';
 import { useRulers } from '../composables/useRulers';
+import { useCameraPresets } from '../composables/useCameraPresets';
 import { useI18n } from '../composables/useI18n';
 import ColorPickerWheel from './ColorPickerWheel.vue';
 import {
@@ -13,11 +13,13 @@ import {
   Minus,
   Plus,
   FlipHorizontal,
-  FlipVertical
+  FlipVertical,
+  Compass
 } from 'lucide-vue-next';
 
 const { currentTool, penSize, setTool, setPenSize, flipHorizontal, flipVertical } = usePainting();
 const { activeRuler, setRuler } = useRulers();
+const { isPresetsPanelOpen, togglePresetsPanel } = useCameraPresets();
 const { t } = useI18n();
 
 function adjustSize(delta: number) {
@@ -96,7 +98,7 @@ function adjustSize(delta: number) {
       </button>
     </div>
 
-    <!-- 2. Flip Transformations -->
+    <!-- 2. Flip Transformations & Inclinación -->
     <div class="flip-actions-group">
       <button
         class="flip-btn"
@@ -113,6 +115,15 @@ function adjustSize(delta: number) {
       >
         <FlipVertical :size="14" />
         <span>Voltear V</span>
+      </button>
+      <button
+        class="flip-btn"
+        :class="{ active: isPresetsPanelOpen }"
+        title="Inclinación y Proyecciones Axonométricas"
+        @click="togglePresetsPanel"
+      >
+        <Compass :size="14" />
+        <span>Inclinación</span>
       </button>
     </div>
 

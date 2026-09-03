@@ -9,6 +9,8 @@ import { useI18n } from './useI18n';
 
 import { useSelection } from './useSelection';
 import { useRulers } from './useRulers';
+import { useZenMode } from './useZenMode';
+import { useCameraPresets } from './useCameraPresets';
 
 const STORAGE_KEY = 'gururi_custom_hotkeys_v1';
 
@@ -128,6 +130,8 @@ export function useHotkeys() {
   const { toggleGroundGrid, isHelpOpen, appMode } = useAppState();
   const { saveProjectToFile } = useProjectStorage();
   const { t } = useI18n();
+  const { isZenMode, toggleZenMode, showZenToast } = useZenMode();
+  const { loadBookmark, saveBookmark, togglePresetsPanel } = useCameraPresets();
 
   function onKeyDown(e: KeyboardEvent) {
     // If configuring hotkey in modal or typing in input, ignore global triggers
@@ -135,7 +139,28 @@ export function useHotkeys() {
       return;
     }
 
+    // Zen Mode: Tab toggle works globally
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      toggleZenMode();
+      return;
+    }
+
     if (appMode.value !== '360') {
+      return;
+    }
+
+    // Bookmarks: Alt + 1..4 (Load) / Alt + Shift + 1..4 (Save)
+    if (e.altKey && !e.ctrlKey && ['1', '2', '3', '4'].includes(e.key)) {
+      e.preventDefault();
+      const slot = parseInt(e.key, 10);
+      if (e.shiftKey) {
+        saveBookmark(slot);
+        showZenToast(`Vista guardada en Slot #${slot}`);
+      } else {
+        loadBookmark(slot);
+        showZenToast(`Slot #${slot} cargado`);
+      }
       return;
     }
 
@@ -149,7 +174,7 @@ export function useHotkeys() {
     }
 
     // Eyedropper Hold (Alt alone) - prevent default browser menu focus and selection
-    if (!e.ctrlKey && !e.metaKey && (matchesBinding('eyedropperHold', eventKeyStr, rawKey) || e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight')) {
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && (matchesBinding('eyedropperHold', eventKeyStr, rawKey) || e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight')) {
       e.preventDefault();
       if (!isAltEyedropperActive.value) {
         isAltEyedropperActive.value = true;
@@ -233,42 +258,53 @@ export function useHotkeys() {
     // Tools
     if (matchesBinding('toolPen', eventKeyStr, rawKey)) {
       setTool('pen');
+      if (isZenMode.value) showZenToast('Pincel (B)');
       return;
     }
 
     if (matchesBinding('toolEraser', eventKeyStr, rawKey)) {
       setTool('eraser');
+      if (isZenMode.value) showZenToast('Borrador (E)');
       return;
     }
 
     if (matchesBinding('toolBucket', eventKeyStr, rawKey)) {
       setTool('bucket');
+      if (isZenMode.value) showZenToast('Relleno (G)');
       return;
     }
 
     if (matchesBinding('toolEyedropper', eventKeyStr, rawKey)) {
       setTool('eyedropper');
+      if (isZenMode.value) showZenToast('Cuentagotas (I)');
       return;
     }
 
     if (matchesBinding('toolLasso', eventKeyStr, rawKey)) {
       setTool('lasso');
+      if (isZenMode.value) showZenToast('Lazo de Selección (L)');
       return;
     }
 
     if (matchesBinding('toolRuler', eventKeyStr, rawKey)) {
-      setRuler(activeRuler.value === 'orthogonal' ? 'none' : 'orthogonal');
+      const nextRuler = activeRuler.value === 'orthogonal' ? 'none' : 'orthogonal';
+      setRuler(nextRuler);
+      if (isZenMode.value) showZenToast(nextRuler === 'orthogonal' ? 'Regla H/V Activada' : 'Regla Desactivada');
       return;
     }
 
     // Brush Size Dec / Inc
     if (matchesBinding('brushSizeDec', eventKeyStr, rawKey)) {
-      setPenSize(penSize.value - 1);
+      const nextSize = Math.max(1, penSize.value - 1);
+      setPenSize(nextSize);
+      if (isZenMode.value) showZenToast(`Tamaño: ${nextSize}px`);
       return;
     }
 
     if (matchesBinding('brushSizeInc', eventKeyStr, rawKey)) {
-      setPenSize(penSize.value + 1);
+      const nextSize = penSize.value + 1;
+      setPenSize(nextSize);
+      if (isZenMode.value) showZenToast(`Tamaño: ${nextSize}px`);
       return;
     }
 
