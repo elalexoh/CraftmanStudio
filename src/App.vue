@@ -131,6 +131,11 @@ function init360Engine() {
     });
 
     // Listen to environment settings (background color, grid color, grid mode)
+    const { backgroundColor: envBg, gridColor: envGridCol, gridOpacity: envGridOp, gridMode: envGridMode } = useEnvironmentSettings();
+    engine.setBackgroundColor(envBg.value);
+    engine.setGridColor(envGridCol.value, envGridOp.value);
+    engine.setGridType(envGridMode.value);
+
     onEnvironmentChanged((env) => {
       if (!engine) return;
       engine.setBackgroundColor(env.backgroundColor);

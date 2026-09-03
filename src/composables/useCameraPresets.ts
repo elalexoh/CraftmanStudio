@@ -33,13 +33,38 @@ const orientation = reactive<CameraOrientation>({
 const isShiftSnapActive = ref<boolean>(false);
 const isPresetsPanelOpen = ref<boolean>(false);
 
-// 4 slots de bookmarks por defecto
-const bookmarks = ref<CameraBookmark[]>([
-  { id: 1, label: 'Vista 1', preset: 'isometric', orientation: { yaw: 45, pitch: -35.264, roll: 0 } },
-  { id: 2, label: 'Vista 2', preset: 'military', orientation: { yaw: 45, pitch: -45, roll: 0 } },
-  { id: 3, label: 'Vista 3', preset: 'cavalier', orientation: { yaw: 45, pitch: -30, roll: 0 } },
-  { id: 4, label: 'Vista 4', preset: 'dimetric', orientation: { yaw: 26.565, pitch: -20, roll: 0 } },
-]);
+const STORAGE_KEY_BOOKMARKS = 'craftsman_camera_bookmarks';
+
+function loadStoredBookmarks(): CameraBookmark[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BOOKMARKS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length >= 4) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load camera bookmarks from localStorage:', e);
+  }
+  return [
+    { id: 1, label: 'Vista 1', preset: 'isometric', orientation: { yaw: 45, pitch: -35.264, roll: 0 } },
+    { id: 2, label: 'Vista 2', preset: 'military', orientation: { yaw: 45, pitch: -45, roll: 0 } },
+    { id: 3, label: 'Vista 3', preset: 'cavalier', orientation: { yaw: 45, pitch: -30, roll: 0 } },
+    { id: 4, label: 'Vista 4', preset: 'dimetric', orientation: { yaw: 26.565, pitch: -20, roll: 0 } },
+  ];
+}
+
+function persistBookmarks(list: CameraBookmark[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_BOOKMARKS, JSON.stringify(list));
+  } catch (e) {
+    console.warn('Could not save camera bookmarks to localStorage:', e);
+  }
+}
+
+// 4 slots de bookmarks persistentes en localStorage
+const bookmarks = ref<CameraBookmark[]>(loadStoredBookmarks());
 
 // Callbacks para sincronizar con el motor 3D sin acoplar
 type OrientationChangeCallback = (orientation: CameraOrientation, preset: AxonometricPreset, smooth: boolean) => void;
@@ -112,6 +137,7 @@ export function useCameraPresets() {
         preset: currentPreset.value,
         orientation: { ...orientation },
       };
+      persistBookmarks(bookmarks.value);
     }
   };
 

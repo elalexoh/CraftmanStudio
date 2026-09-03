@@ -36,10 +36,38 @@ export const GRID_MODE_OPTIONS: { id: GridMode; label: string; desc: string }[] 
   { id: 'polar', label: 'Polar Concéntrica', desc: 'Anillos concéntricos y rayos radiales' },
 ];
 
-const backgroundColor = ref('#f1f5f9');
-const gridColor = ref('#06b6d4');
-const gridOpacity = ref(0.38);
-const gridMode = ref<GridMode>('standard');
+const STORAGE_KEY_ENV = 'craftsman_environment_settings';
+
+function loadStoredEnv() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ENV);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed) {
+        return {
+          backgroundColor: parsed.backgroundColor || '#f1f5f9',
+          gridColor: parsed.gridColor || '#06b6d4',
+          gridOpacity: typeof parsed.gridOpacity === 'number' ? parsed.gridOpacity : 0.38,
+          gridMode: (parsed.gridMode as GridMode) || 'standard',
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load environment settings from localStorage:', e);
+  }
+  return {
+    backgroundColor: '#f1f5f9',
+    gridColor: '#06b6d4',
+    gridOpacity: 0.38,
+    gridMode: 'standard' as GridMode,
+  };
+}
+
+const initialEnv = loadStoredEnv();
+const backgroundColor = ref(initialEnv.backgroundColor);
+const gridColor = ref(initialEnv.gridColor);
+const gridOpacity = ref(initialEnv.gridOpacity);
+const gridMode = ref<GridMode>(initialEnv.gridMode);
 
 type EnvCallback = (settings: {
   backgroundColor: string;
@@ -57,6 +85,11 @@ function notify() {
     gridOpacity: gridOpacity.value,
     gridMode: gridMode.value,
   };
+  try {
+    localStorage.setItem(STORAGE_KEY_ENV, JSON.stringify(current));
+  } catch (e) {
+    console.warn('Could not save environment settings to localStorage:', e);
+  }
   listeners.forEach(cb => cb(current));
 }
 
