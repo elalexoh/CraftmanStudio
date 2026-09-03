@@ -42,9 +42,13 @@ export interface HistoryStep {
 }
 
 export interface ProjectData {
-  version: string;
-  resolution: CanvasResolution;
+  version: number | string;
+  width?: number;
+  height?: number;
+  resolution?: CanvasResolution;
   eyeHeight: number;
+  groundGrid?: boolean;
+  activeLayerId?: string;
   layers: SerializedLayer[];
   recentColors: string[];
 }
