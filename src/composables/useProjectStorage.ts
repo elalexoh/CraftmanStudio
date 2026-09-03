@@ -3,6 +3,7 @@ import type { ProjectData, CanvasResolution, SerializedLayer } from '../types/pa
 import { useLayers } from './useLayers';
 import { useAppState } from './useAppState';
 import { usePainting } from './usePainting';
+import { getActivePanoramicEngine } from '../three/PanoramicEngine';
 
 const DB_NAME = 'gururi_paint_db';
 const STORE_NAME = 'projects';
@@ -80,7 +81,7 @@ export function useProjectStorage() {
 
   /**
    * Export fully layered Photoshop Document (.psd) with transparent alpha channels
-   * Compatible with MediBang, Clip Studio Paint, Photoshop, Krita, Procreate, Photopea, GIMP, etc.
+   * If showGroundGrid is true, exports the perspective grid as a guide layer at the bottom.
    */
   function exportPsd(customFilename?: string) {
     if (!masterCanvas) return;
@@ -92,10 +93,34 @@ export function useProjectStorage() {
 
     const offsetRatio = seamOffset.value || 0;
 
-    // Build PSD layered structure from bottom to top
-    const psdChildren: PsdLayer[] = layers.value.map((layer) => {
+    // Check if ground grid / malla should be included
+    const engine = getActivePanoramicEngine();
+    let gridCanvas: HTMLCanvasElement | null = null;
+    if (showGroundGrid.value && engine) {
+      gridCanvas = engine.renderEquirectangularGridToCanvas(width, height);
+    }
+
+    const psdChildren: PsdLayer[] = [];
+
+    // Add Malla / Grid as bottom guide layer if active
+    if (gridCanvas) {
+      const gridShifted = shiftCanvas(gridCanvas, width, height, offsetRatio);
+      psdChildren.push({
+        name: 'Malla Guía de Perspectiva 360°',
+        canvas: gridShifted,
+        opacity: 1,
+        hidden: false,
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+      });
+    }
+
+    // Add user drawing layers from bottom to top
+    layers.value.forEach((layer) => {
       const layerCanvas = shiftCanvas(layer.canvas, width, height, offsetRatio);
-      return {
+      psdChildren.push({
         name: layer.name,
         canvas: layerCanvas,
         opacity: layer.opacity,
@@ -104,10 +129,23 @@ export function useProjectStorage() {
         top: 0,
         right: width,
         bottom: height,
-      };
+      });
     });
 
-    const compositeCanvas = shiftCanvas(masterCanvas, width, height, offsetRatio);
+    let compositeCanvas: HTMLCanvasElement;
+    if (gridCanvas) {
+      const comp = document.createElement('canvas');
+      comp.width = width;
+      comp.height = height;
+      const cCtx = comp.getContext('2d')!;
+      const gridShifted = shiftCanvas(gridCanvas, width, height, offsetRatio);
+      cCtx.drawImage(gridShifted, 0, 0, width, height);
+      const masterShifted = shiftCanvas(masterCanvas, width, height, offsetRatio);
+      cCtx.drawImage(masterShifted, 0, 0, width, height);
+      compositeCanvas = comp;
+    } else {
+      compositeCanvas = shiftCanvas(masterCanvas, width, height, offsetRatio);
+    }
 
     const psd: Psd = {
       width,
@@ -138,6 +176,7 @@ export function useProjectStorage() {
 
   /**
    * Export flattened PNG (with white background or pure transparency)
+   * If showGroundGrid is true, draws the perspective grid beneath the painting strokes.
    */
   function exportPng(customFilename?: string, includeWhiteBg: boolean = true) {
     if (!masterCanvas) return;
@@ -157,6 +196,14 @@ export function useProjectStorage() {
     if (includeWhiteBg) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
+    }
+
+    // Draw Malla / Grid if active
+    const engine = getActivePanoramicEngine();
+    if (showGroundGrid.value && engine) {
+      const gridCanvas = engine.renderEquirectangularGridToCanvas(width, height);
+      const gridShifted = shiftCanvas(gridCanvas, width, height, offsetRatio);
+      ctx.drawImage(gridShifted, 0, 0, width, height);
     }
 
     const shifted = shiftCanvas(masterCanvas, width, height, offsetRatio);
