@@ -25,8 +25,21 @@ export class PanoramicEngine {
   // Camera angles (in radians)
   public yaw: number = 0; // horizontal angle
   public pitch: number = 0; // vertical angle
+  public roll: number = 0; // roll angle
   public eyeHeight: number = 1.5; // in meters
   public showGroundGrid: boolean = true;
+  public onCameraRotated?: (yawDeg: number, pitchDeg: number, rollDeg: number) => void;
+
+  private targetYaw: number = 0;
+  private targetPitch: number = 0;
+  private targetRoll: number = 0;
+  private isTransitioning: boolean = false;
+  private transitionStart: number = 0;
+  private transitionDuration: number = 300;
+  private startYaw: number = 0;
+  private startPitch: number = 0;
+  private startRoll: number = 0;
+  private onTransitionComplete?: () => void;
 
   // Eraser indicator
   private eraserCursorMesh: THREE.LineLoop | null = null;
@@ -37,7 +50,7 @@ export class PanoramicEngine {
   constructor(container: HTMLElement) {
     this.container = container;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf1f5f9); // Light clean sky background
+    this.scene.background = new THREE.Color(0xf1f5f9); // Original sky background
 
     this.raycaster = new THREE.Raycaster();
 
@@ -71,8 +84,10 @@ export class PanoramicEngine {
 
     this.setupGroundGrid();
     this.setupEraserCursor();
+    this.setupRulerGuides();
     this.scene.add(this.rulerGuideGroup);
     this.updateCameraDirection();
+    this.updateDomRect();
     this.startRenderLoop();
 
     window.addEventListener('resize', this.onResize);
@@ -120,19 +135,71 @@ export class PanoramicEngine {
     const fragmentShader = `
       varying vec3 vWorldPosition;
       uniform float gridSize;
+      uniform int gridType; // 0: standard, 1: isometric, 2: curvilinear, 3: 1-point, 4: 2-point, 5: polar
+      uniform vec3 gridColor;
+      uniform float gridOpacity;
+
       void main() {
-        vec2 gridPosition = vWorldPosition.xz / gridSize;
-        vec2 gridDistance = abs(fract(gridPosition - 0.5) - 0.5) / fwidth(gridPosition);
-        float line = 1.0 - min(min(gridDistance.x, gridDistance.y), 1.0);
-        vec3 gridColor = vec3(0.25, 0.55, 1.0);
-        gl_FragColor = vec4(gridColor, line * 0.35);
+        vec2 p = vWorldPosition.xz / gridSize;
+        float line = 0.0;
+
+        if (gridType == 1) {
+          // 1. Isometric 3-axis grid (0 deg, 60 deg, 120 deg)
+          mat2 rot60 = mat2(0.5, -0.866025, 0.866025, 0.5);
+          mat2 rot120 = mat2(-0.5, -0.866025, 0.866025, -0.5);
+          vec2 p2 = rot60 * p;
+          vec2 p3 = rot120 * p;
+
+          float d1 = abs(fract(p.y - 0.5) - 0.5) / fwidth(p.y);
+          float d2 = abs(fract(p2.y - 0.5) - 0.5) / fwidth(p2.y);
+          float d3 = abs(fract(p3.y - 0.5) - 0.5) / fwidth(p3.y);
+
+          line = max(max(1.0 - min(d1, 1.0), 1.0 - min(d2, 1.0)), 1.0 - min(d3, 1.0));
+        } else if (gridType == 2) {
+          // 2. Curvilinear 360 Fisheye Perspective
+          float r = length(p);
+          float curvFactor = 1.0 / (1.0 + r * 0.02);
+          vec2 cp = p * curvFactor;
+          vec2 dCurv = abs(fract(cp - 0.5) - 0.5) / fwidth(cp);
+          line = 1.0 - min(min(dCurv.x, dCurv.y), 1.0);
+        } else if (gridType == 3) {
+          // 3. 1-Point Perspective (Central vanishing convergence)
+          float depth = p.y;
+          float angle = atan(p.x, abs(p.y) + 0.1) / 3.14159265;
+          float dDepth = abs(fract(depth - 0.5) - 0.5) / fwidth(depth);
+          float dRay = abs(fract(angle * 16.0 - 0.5) - 0.5) / fwidth(angle * 16.0);
+          line = max(1.0 - min(dDepth, 1.0), 1.0 - min(dRay, 1.0));
+        } else if (gridType == 4) {
+          // 4. 2-Point Perspective (Left and right horizon vanishing points)
+          float ang1 = atan(p.y, p.x + 40.0) / 3.14159265;
+          float ang2 = atan(p.y, p.x - 40.0) / 3.14159265;
+          float l1 = 1.0 - min(abs(fract(ang1 * 24.0 - 0.5) - 0.5) / fwidth(ang1 * 24.0), 1.0);
+          float l2 = 1.0 - min(abs(fract(ang2 * 24.0 - 0.5) - 0.5) / fwidth(ang2 * 24.0), 1.0);
+          line = max(l1, l2);
+        } else if (gridType == 5) {
+          // 5. Polar Concéntrico (Rings & Spokes)
+          float r = length(p);
+          float theta = atan(p.y, p.x) / (2.0 * 3.14159265);
+          float ring = 1.0 - min(abs(fract(r - 0.5) - 0.5) / fwidth(r), 1.0);
+          float spoke = 1.0 - min(abs(fract(theta * 24.0 - 0.5) - 0.5) / fwidth(theta * 24.0), 1.0);
+          line = max(ring, spoke);
+        } else {
+          // 0. Standard cartesian grid
+          vec2 d = abs(fract(p - 0.5) - 0.5) / fwidth(p);
+          line = 1.0 - min(min(d.x, d.y), 1.0);
+        }
+
+        gl_FragColor = vec4(gridColor, line * gridOpacity);
       }
     `;
 
     // 1. Infinite Ground Grid at y = 0
     this.groundGridMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        gridSize: { value: Math.sqrt(this.eyeHeight / 1.5) }
+        gridSize: { value: Math.sqrt(this.eyeHeight / 1.5) },
+        gridType: { value: 0 },
+        gridColor: { value: new THREE.Color(0x06b6d4) },
+        gridOpacity: { value: 0.38 }
       },
       transparent: true,
       depthTest: false,
@@ -247,6 +314,54 @@ export class PanoramicEngine {
     if (this.horizonGuide) this.horizonGuide.visible = show;
   }
 
+  public setBackgroundColor(colorHex: string) {
+    const col = new THREE.Color(colorHex);
+    this.scene.background = col;
+    this.renderer.setClearColor(col, 1.0);
+  }
+
+  public setGridColor(colorHex: string, opacity?: number) {
+    const col = new THREE.Color(colorHex);
+    if (this.groundGridMaterial) {
+      this.groundGridMaterial.uniforms.gridColor.value = col;
+      if (opacity !== undefined) {
+        this.groundGridMaterial.uniforms.gridOpacity.value = opacity;
+      }
+    }
+    if (this.verticalGuidesMesh) {
+      const mat = this.verticalGuidesMesh.material as THREE.LineBasicMaterial;
+      mat.color.copy(col);
+      if (opacity !== undefined) mat.opacity = opacity * 0.5;
+    }
+    if (this.horizonGuide) {
+      const mat = this.horizonGuide.material as THREE.LineBasicMaterial;
+      mat.color.copy(col);
+    }
+  }
+
+  public setGridOpacity(opacity: number) {
+    if (this.groundGridMaterial) {
+      this.groundGridMaterial.uniforms.gridOpacity.value = Math.max(0.05, Math.min(1.0, opacity));
+    }
+    if (this.verticalGuidesMesh) {
+      const mat = this.verticalGuidesMesh.material as THREE.LineBasicMaterial;
+      mat.opacity = opacity * 0.5;
+    }
+  }
+
+  public setGridType(type: 'standard' | 'isometric' | 'curvilinear' | 'one_point' | 'two_point' | 'polar' | string) {
+    let val = 0;
+    if (type === 'isometric') val = 1;
+    else if (type === 'curvilinear' || type === 'axonometric') val = 2;
+    else if (type === 'one_point') val = 3;
+    else if (type === 'two_point') val = 4;
+    else if (type === 'polar') val = 5;
+
+    if (this.groundGridMaterial) {
+      this.groundGridMaterial.uniforms.gridType.value = val;
+    }
+  }
+
   private setupEraserCursor() {
     const segments = 32;
     const points: THREE.Vector3[] = [];
@@ -283,6 +398,14 @@ export class PanoramicEngine {
   }
 
   private rulerGuideGroup: THREE.Group = new THREE.Group();
+  private rulerLineHMesh: THREE.Line | null = null;
+  private rulerLineVMesh: THREE.Line | null = null;
+  private domRect: DOMRect | null = null;
+
+  private _scratchDir = new THREE.Vector3();
+  private _scratchAnchor3D = new THREE.Vector3();
+  private _scratchAnchorNDC = new THREE.Vector3();
+
   private rulerLineMaterial = new THREE.LineBasicMaterial({
     color: 0x06b6d4, // Bright cyan
     transparent: true,
@@ -291,114 +414,96 @@ export class PanoramicEngine {
     depthWrite: false
   });
 
-  public updateRulerGuides(rulerType: string, anchor?: { x: number; y: number } | null, center?: { x: number; y: number }) {
-    // Clear previous ruler objects and dispose geometries
-    while (this.rulerGuideGroup.children.length > 0) {
-      const obj = this.rulerGuideGroup.children[0] as THREE.Line;
-      if (obj && obj.geometry) {
-        obj.geometry.dispose();
-      }
-      this.rulerGuideGroup.remove(obj);
+  private setupRulerGuides() {
+    const segments = 24;
+    const ptsH: THREE.Vector3[] = [];
+    const ptsV: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i++) {
+      ptsH.push(new THREE.Vector3());
+      ptsV.push(new THREE.Vector3());
     }
 
-    if (rulerType === 'none' || !this.masterCanvas) {
+    const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
+    this.rulerLineHMesh = new THREE.Line(geomH, this.rulerLineMaterial);
+    this.rulerLineHMesh.renderOrder = 20;
+    this.rulerLineHMesh.visible = false;
+    this.rulerLineHMesh.frustumCulled = false;
+    this.rulerGuideGroup.add(this.rulerLineHMesh);
+
+    const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
+    this.rulerLineVMesh = new THREE.Line(geomV, this.rulerLineMaterial);
+    this.rulerLineVMesh.renderOrder = 20;
+    this.rulerLineVMesh.visible = false;
+    this.rulerLineVMesh.frustumCulled = false;
+    this.rulerGuideGroup.add(this.rulerLineVMesh);
+  }
+
+  public updateDomRect() {
+    if (this.renderer?.domElement) {
+      this.domRect = this.renderer.domElement.getBoundingClientRect();
+    }
+  }
+
+  public updateRulerGuides(
+    rulerType: string,
+    anchor?: { x: number; y: number } | null
+  ) {
+    if (rulerType === 'none' || !this.masterCanvas || !anchor) {
+      if (this.rulerLineHMesh) this.rulerLineHMesh.visible = false;
+      if (this.rulerLineVMesh) this.rulerLineVMesh.visible = false;
       return;
     }
 
     const w = this.masterCanvas.width;
     const h = this.masterCanvas.height;
-    const r = 49.5; // spherical projection distance (inside 50 radius sphere)
 
-    const pixelToSphere = (px: number, py: number): THREE.Vector3 => {
-      const u = ((px % w) + w) % w / w;
-      const v = Math.max(0, Math.min(1, 1 - py / h));
-      const phi = (1 - v) * Math.PI;
-      const theta = u * Math.PI * 2;
+    const u = (((anchor.x % w) + w) % w) / w;
+    const v = Math.max(0, Math.min(1, 1 - anchor.y / h));
+    const phi = (1 - v) * Math.PI;
+    const theta = u * Math.PI * 2;
+    const r = 49.5;
 
-      const x = -r * Math.cos(theta) * Math.sin(phi);
-      const y = r * Math.cos(phi);
-      const z = r * Math.sin(theta) * Math.sin(phi);
-      return new THREE.Vector3(x, y, z);
-    };
+    this._scratchAnchor3D.set(
+      -r * Math.cos(theta) * Math.sin(phi),
+      r * Math.cos(phi),
+      r * Math.sin(theta) * Math.sin(phi)
+    );
+    this._scratchAnchorNDC.copy(this._scratchAnchor3D).project(this.camera);
 
-    const lineMaterial = this.rulerLineMaterial;
+    const showH = rulerType === 'orthogonal' || rulerType === 'horizontal';
+    const showV = rulerType === 'orthogonal' || rulerType === 'vertical';
 
-    if (rulerType === 'vertical') {
-      // If stroke anchor is active, draw primary active meridian line
-      if (anchor) {
-        const pts: THREE.Vector3[] = [];
-        const segments = 48;
-        for (let i = 0; i <= segments; i++) {
-          const y = (i / segments) * h;
-          pts.push(pixelToSphere(anchor.x, y));
-        }
-        const geom = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.Line(geom, lineMaterial);
-        line.renderOrder = 20;
-        this.rulerGuideGroup.add(line);
-      } else {
-        // Draw 12 vertical meridian guide lines around the sphere (every 30 degrees)
-        for (let m = 0; m < 12; m++) {
-          const x = (m / 12) * w;
-          const pts: THREE.Vector3[] = [];
-          const segments = 32;
-          for (let i = 0; i <= segments; i++) {
-            const y = (i / segments) * h;
-            pts.push(pixelToSphere(x, y));
+    // 1. Screen Horizontal guide line (fixed y = anchorNDC.y)
+    if (this.rulerLineHMesh) {
+      this.rulerLineHMesh.visible = showH;
+      if (showH) {
+        const posAttr = this.rulerLineHMesh.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i <= 24; i++) {
+          const ndcX = -1 + (i / 24) * 2;
+          this._scratchDir.set(ndcX, this._scratchAnchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+          const hit = this.intersectRaySphere(this.camera.position, this._scratchDir, 49.5);
+          if (hit) {
+            posAttr.setXYZ(i, hit.point.x, hit.point.y, hit.point.z);
           }
-          const geom = new THREE.BufferGeometry().setFromPoints(pts);
-          const line = new THREE.Line(geom, lineMaterial);
-          line.renderOrder = 20;
-          this.rulerGuideGroup.add(line);
         }
+        posAttr.needsUpdate = true;
       }
-    } else if (rulerType === 'horizontal') {
-      // If stroke anchor is active, draw primary active latitude circle
-      if (anchor) {
-        const pts: THREE.Vector3[] = [];
-        const segments = 64;
-        for (let i = 0; i <= segments; i++) {
-          const x = (i / segments) * w;
-          pts.push(pixelToSphere(x, anchor.y));
-        }
-        const geom = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.LineLoop(geom, lineMaterial);
-        line.renderOrder = 20;
-        this.rulerGuideGroup.add(line);
-      } else {
-        // Draw 5 horizontal latitude circles (-60, -30, 0 horizon, +30, +60 degrees)
-        const latitudes = [0.15, 0.32, 0.5, 0.68, 0.85];
-        for (const latRatio of latitudes) {
-          const y = latRatio * h;
-          const pts: THREE.Vector3[] = [];
-          const segments = 64;
-          for (let i = 0; i <= segments; i++) {
-            const x = (i / segments) * w;
-            pts.push(pixelToSphere(x, y));
+    }
+
+    // 2. Screen Vertical guide line (fixed x = anchorNDC.x)
+    if (this.rulerLineVMesh) {
+      this.rulerLineVMesh.visible = showV;
+      if (showV) {
+        const posAttr = this.rulerLineVMesh.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i <= 24; i++) {
+          const ndcY = -1 + (i / 24) * 2;
+          this._scratchDir.set(this._scratchAnchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+          const hit = this.intersectRaySphere(this.camera.position, this._scratchDir, 49.5);
+          if (hit) {
+            posAttr.setXYZ(i, hit.point.x, hit.point.y, hit.point.z);
           }
-          const geom = new THREE.BufferGeometry().setFromPoints(pts);
-          const line = new THREE.LineLoop(geom, lineMaterial);
-          line.renderOrder = 20;
-          this.rulerGuideGroup.add(line);
         }
-      }
-    } else if (rulerType === 'radial' && center) {
-      // 12 radial perspective rays
-      const rays = 12;
-      for (let i = 0; i < rays; i++) {
-        const angle = (i / rays) * Math.PI * 2;
-        const pts: THREE.Vector3[] = [];
-        const segments = 32;
-        for (let s = 0; s <= segments; s++) {
-          const dist = (s / segments) * (w * 0.7);
-          const curX = center.x + Math.cos(angle) * dist;
-          const curY = center.y + Math.sin(angle) * dist;
-          pts.push(pixelToSphere(curX, curY));
-        }
-        const geom = new THREE.BufferGeometry().setFromPoints(pts);
-        const line = new THREE.Line(geom, lineMaterial);
-        line.renderOrder = 20;
-        this.rulerGuideGroup.add(line);
+        posAttr.needsUpdate = true;
       }
     }
   }
@@ -561,12 +666,78 @@ export class PanoramicEngine {
   }
 
   public rotateCamera(deltaYaw: number, deltaPitch: number) {
+    this.rotateCameraWithSnap(deltaYaw, deltaPitch, false);
+  }
+
+  public rotateCameraWithSnap(deltaYaw: number, deltaPitch: number, isSnap: boolean = false) {
+    this.isTransitioning = false;
     this.yaw += deltaYaw;
     this.yaw = (this.yaw % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
 
     const maxPitch = (Math.PI / 2) - 0.02;
     this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch + deltaPitch));
+
+    if (isSnap) {
+      const snapStep = (15 * Math.PI) / 180; // 15 degrees snap
+      this.yaw = Math.round(this.yaw / snapStep) * snapStep;
+      this.pitch = Math.round(this.pitch / snapStep) * snapStep;
+    }
+
     this.updateCameraDirection();
+    this.notifyCameraRotation();
+  }
+
+  public setOrientationDeg(yawDeg: number, pitchDeg: number, rollDeg: number = 0) {
+    this.isTransitioning = false;
+    this.yaw = THREE.MathUtils.degToRad(((yawDeg % 360) + 360) % 360);
+    const clampedPitch = Math.max(-89.0, Math.min(89.0, pitchDeg));
+    this.pitch = THREE.MathUtils.degToRad(clampedPitch);
+    this.roll = THREE.MathUtils.degToRad(rollDeg);
+    this.updateCameraDirection();
+    this.notifyCameraRotation();
+  }
+
+  public animateToOrientationDeg(
+    targetYawDeg: number,
+    targetPitchDeg: number,
+    targetRollDeg: number = 0,
+    durationMs: number = 300,
+    onComplete?: () => void
+  ) {
+    this.startYaw = this.yaw;
+    this.startPitch = this.pitch;
+    this.startRoll = this.roll;
+
+    let targetY = THREE.MathUtils.degToRad(((targetYawDeg % 360) + 360) % 360);
+    // Find shortest angular path for yaw
+    let diff = targetY - this.startYaw;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    this.targetYaw = this.startYaw + diff;
+
+    const clampedPitch = Math.max(-89.0, Math.min(89.0, targetPitchDeg));
+    this.targetPitch = THREE.MathUtils.degToRad(clampedPitch);
+    this.targetRoll = THREE.MathUtils.degToRad(targetRollDeg);
+
+    this.transitionStart = performance.now();
+    this.transitionDuration = Math.max(50, durationMs);
+    this.onTransitionComplete = onComplete;
+    this.isTransitioning = true;
+  }
+  private notifyRotationScheduled: boolean = false;
+  private notifyCameraRotation() {
+    if (!this.onCameraRotated) return;
+    if (this.notifyRotationScheduled) return;
+    this.notifyRotationScheduled = true;
+    requestAnimationFrame(() => {
+      this.notifyRotationScheduled = false;
+      if (this.onCameraRotated) {
+        const yDeg = ((THREE.MathUtils.radToDeg(this.yaw) % 360) + 360) % 360;
+        const pDeg = THREE.MathUtils.radToDeg(this.pitch);
+        const rDeg = THREE.MathUtils.radToDeg(this.roll);
+        this.onCameraRotated(yDeg, pDeg, rDeg);
+      }
+    });
   }
 
   public zoomFov(deltaFov: number) {
@@ -580,17 +751,57 @@ export class PanoramicEngine {
     const cosYaw = Math.cos(this.yaw);
     const sinYaw = Math.sin(this.yaw);
 
-    const target = new THREE.Vector3(
+    const forward = new THREE.Vector3(
       cosPitch * sinYaw,
       sinPitch,
       -cosPitch * cosYaw
-    );
+    ).normalize();
 
+    // Standard up vector before roll
+    let right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+    if (right.lengthSq() < 0.0001) {
+      right = new THREE.Vector3(1, 0, 0);
+    } else {
+      right.normalize();
+    }
+    const upBase = new THREE.Vector3().crossVectors(right, forward).normalize();
+
+    // Apply roll around forward axis
+    const up = upBase.clone().multiplyScalar(Math.cos(this.roll)).add(right.clone().multiplyScalar(Math.sin(this.roll)));
+
+    this.camera.up.copy(up);
     this.camera.lookAt(
-      this.camera.position.x + target.x,
-      this.camera.position.y + target.y,
-      this.camera.position.z + target.z
+      this.camera.position.x + forward.x,
+      this.camera.position.y + forward.y,
+      this.camera.position.z + forward.z
     );
+  }
+
+  private intersectRaySphere(origin: THREE.Vector3, direction: THREE.Vector3, radius: number): { point: THREE.Vector3; uv: THREE.Vector2 } | null {
+    // Analytical ray-sphere intersection with sphere at (0, 0, 0)
+    // Ray: P(t) = O + t*D. Sphere: |P|^2 = R^2
+    const b = origin.dot(direction);
+    const c = origin.lengthSq() - radius * radius;
+    const discriminant = b * b - c;
+
+    if (discriminant < 0) return null;
+
+    // Forward intersection distance
+    const t = -b + Math.sqrt(discriminant);
+    if (t < 0) return null;
+
+    const point = origin.clone().addScaledVector(direction, t);
+
+    // Calculate UV matching Three.js equirectangular SphereGeometry
+    const norm = point.clone().normalize();
+    let theta = Math.atan2(norm.z, -norm.x);
+    if (theta < 0) theta += Math.PI * 2;
+    const u = theta / (Math.PI * 2);
+
+    const phi = Math.acos(Math.max(-1, Math.min(1, norm.y)));
+    const v = 1 - phi / Math.PI;
+
+    return { point, uv: new THREE.Vector2(u, v) };
   }
 
   public raycastFromClientCoords(clientX: number, clientY: number): RaycastResult | null {
@@ -598,26 +809,96 @@ export class PanoramicEngine {
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-    if (!this.sphereMesh) return null;
-    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
-    const intersects = this.raycaster.intersectObject(this.sphereMesh, false);
+    // Ultra-fast analytical camera ray unproject
+    const dir = new THREE.Vector3(x, y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+    const hit = this.intersectRaySphere(this.camera.position, dir, 50);
 
-    if (intersects.length > 0 && intersects[0].uv) {
-      const hit = intersects[0];
-      const uv = hit.uv!;
+    if (hit) {
       const canvasWidth = this.masterCanvas ? this.masterCanvas.width : 4096;
       const canvasHeight = this.masterCanvas ? this.masterCanvas.height : 2048;
 
-      const pixelX = Math.floor(uv.x * canvasWidth);
-      const pixelY = Math.floor((1 - uv.y) * canvasHeight);
+      const pixelX = Math.floor(hit.uv.x * canvasWidth);
+      const pixelY = Math.floor((1 - hit.uv.y) * canvasHeight);
 
       return {
-        uv,
+        uv: hit.uv,
         point: hit.point,
         pixelX: Math.max(0, Math.min(canvasWidth - 1, pixelX)),
         pixelY: Math.max(0, Math.min(canvasHeight - 1, pixelY))
       };
     }
+    return null;
+  }
+
+  public snapRaycastToScreenOrthogonal(
+    clientX: number,
+    clientY: number,
+    anchorPixel: { x: number; y: number },
+    currentLockedAxis: 'x' | 'y' | null,
+    rulerMode: string = 'orthogonal'
+  ): { pixelX: number; pixelY: number; lockedAxis: 'x' | 'y' } | null {
+    const canvasWidth = this.masterCanvas ? this.masterCanvas.width : 4096;
+    const canvasHeight = this.masterCanvas ? this.masterCanvas.height : 2048;
+
+    // 1. Calculate 3D sphere point of anchor
+    const u = (((anchorPixel.x % canvasWidth) + canvasWidth) % canvasWidth) / canvasWidth;
+    const v = Math.max(0, Math.min(1, 1 - anchorPixel.y / canvasHeight));
+    const phi = (1 - v) * Math.PI;
+    const theta = u * Math.PI * 2;
+    const r = 50;
+
+    this._scratchAnchor3D.set(
+      -r * Math.cos(theta) * Math.sin(phi),
+      r * Math.cos(phi),
+      r * Math.sin(theta) * Math.sin(phi)
+    );
+
+    // 2. Project anchor to physical screen pixel coordinates
+    this._scratchAnchorNDC.copy(this._scratchAnchor3D).project(this.camera);
+    const rect = this.domRect || this.renderer.domElement.getBoundingClientRect();
+    const anchorScreenX = ((this._scratchAnchorNDC.x + 1) / 2) * rect.width + rect.left;
+    const anchorScreenY = ((-this._scratchAnchorNDC.y + 1) / 2) * rect.height + rect.top;
+
+    // 3. Delta in physical screen pixels (1:1 uniform aspect ratio)
+    const deltaPxX = clientX - anchorScreenX;
+    const deltaPxY = clientY - anchorScreenY;
+
+    let axis = currentLockedAxis;
+    if (rulerMode === 'horizontal') {
+      axis = 'x';
+    } else if (rulerMode === 'vertical') {
+      axis = 'y';
+    } else if (!axis) {
+      const dist = Math.hypot(deltaPxX, deltaPxY);
+      if (dist >= 6) {
+        // Perfect 1:1 symmetric 45-degree angle test
+        axis = Math.abs(deltaPxX) >= Math.abs(deltaPxY) ? 'x' : 'y';
+      } else {
+        return { pixelX: anchorPixel.x, pixelY: anchorPixel.y, lockedAxis: 'x' };
+      }
+    }
+
+    // 4. Lock target NDC coordinate
+    const currNDCX = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const currNDCY = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    const targetNDCX = axis === 'x' ? currNDCX : this._scratchAnchorNDC.x;
+    const targetNDCY = axis === 'y' ? currNDCY : this._scratchAnchorNDC.y;
+
+    this._scratchDir.set(targetNDCX, targetNDCY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+    const hit = this.intersectRaySphere(this.camera.position, this._scratchDir, 50);
+
+    if (hit) {
+      const px = Math.floor(hit.uv.x * canvasWidth);
+      const py = Math.floor((1 - hit.uv.y) * canvasHeight);
+
+      return {
+        pixelX: Math.max(0, Math.min(canvasWidth - 1, px)),
+        pixelY: Math.max(0, Math.min(canvasHeight - 1, py)),
+        lockedAxis: axis
+      };
+    }
+
     return null;
   }
 
@@ -628,11 +909,36 @@ export class PanoramicEngine {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.updateDomRect();
   };
 
   private startRenderLoop() {
     const render = () => {
       this.animationFrameId = requestAnimationFrame(render);
+      if (this.isTransitioning) {
+        const now = performance.now();
+        const elapsed = now - this.transitionStart;
+        const progress = Math.min(1.0, elapsed / this.transitionDuration);
+        // Smooth cubic easeInOut
+        const ease = progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+        this.yaw = this.startYaw + (this.targetYaw - this.startYaw) * ease;
+        this.pitch = this.startPitch + (this.targetPitch - this.startPitch) * ease;
+        this.roll = this.startRoll + (this.targetRoll - this.startRoll) * ease;
+
+        this.updateCameraDirection();
+
+        if (progress >= 1.0) {
+          this.isTransitioning = false;
+          this.notifyCameraRotation();
+          if (this.onTransitionComplete) {
+            this.onTransitionComplete();
+            this.onTransitionComplete = undefined;
+          }
+        }
+      }
       this.renderer.render(this.scene, this.camera);
     };
     render();

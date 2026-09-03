@@ -5,6 +5,8 @@ export type HotkeyActionId =
   | 'toolEyedropper'
   | 'toolLasso'
   | 'toolRuler'
+  | 'toolRulerHorizontal'
+  | 'toolRulerVertical'
   | 'deselect'
   | 'invertSelection'
   | 'eyedropperHold'

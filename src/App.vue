@@ -16,6 +16,8 @@ import PreviewModal from './components/PreviewModal.vue';
 import HelpModal from './components/HelpModal.vue';
 import HotkeysSettingsModal from './components/HotkeysSettingsModal.vue';
 import MobileBottomTabs from './components/MobileBottomTabs.vue';
+import CameraPresetsPanel from './components/CameraPresetsPanel.vue';
+import ZenHudToast from './components/ZenHudToast.vue';
 
 // 3D Shading Reference Components
 import SceneCanvas from './components/SceneCanvas.vue';
@@ -31,6 +33,9 @@ import { Sun, Box, MousePointerClick } from 'lucide-vue-next';
 import { useHotkeys, isSpaceActive, isZActive } from './composables/useHotkeys';
 import { useRulers } from './composables/useRulers';
 import { useSelection } from './composables/useSelection';
+import { useCameraPresets, onOrientationRequested } from './composables/useCameraPresets';
+import { useEnvironmentSettings, onEnvironmentChanged } from './composables/useEnvironmentSettings';
+import { useZenMode } from './composables/useZenMode';
 
 import FloatingBottomDock from './components/FloatingBottomDock.vue';
 import OnboardingModal from './components/OnboardingModal.vue';
@@ -39,8 +44,10 @@ const viewportRef = ref<HTMLElement | null>(null);
 let engine: PanoramicEngine | null = null;
 const isOnboardingOpen = ref(false);
 
-const { activeRuler, strokeAnchor, radialCenter } = useRulers();
+const { activeRuler, strokeAnchor } = useRulers();
 const { selectionPoints, hasSelection, isDrawingLasso, isInverted } = useSelection();
+const { syncFromEngine } = useCameraPresets();
+const { isZenMode } = useZenMode();
 
 const { masterCanvas, initDefaultLayers } = useLayers();
 const {
@@ -99,6 +106,42 @@ function init360Engine() {
     engine.setEyeHeight(eyeHeight.value);
     engine.toggleGroundGrid(showGroundGrid.value);
     engine.setMasterCanvas(masterCanvas);
+
+    // Sync camera orientation to reactive state
+    engine.onCameraRotated = (yawDeg, pitchDeg, rollDeg) => {
+      syncFromEngine(yawDeg, pitchDeg, rollDeg);
+    };
+
+    // Listen to orientation and preset requests from UI
+    onOrientationRequested((targetOrientation, preset, smooth) => {
+      if (!engine) return;
+      if (preset === 'isometric') {
+        engine.setGridType('isometric');
+      } else if (preset === 'cavalier' || preset === 'military') {
+        engine.setGridType('axonometric');
+      } else {
+        engine.setGridType('standard');
+      }
+
+      if (smooth) {
+        engine.animateToOrientationDeg(targetOrientation.yaw, targetOrientation.pitch, targetOrientation.roll, 350);
+      } else {
+        engine.setOrientationDeg(targetOrientation.yaw, targetOrientation.pitch, targetOrientation.roll);
+      }
+    });
+
+    // Listen to environment settings (background color, grid color, grid mode)
+    const { backgroundColor: envBg, gridColor: envGridCol, gridOpacity: envGridOp, gridMode: envGridMode } = useEnvironmentSettings();
+    engine.setBackgroundColor(envBg.value);
+    engine.setGridColor(envGridCol.value, envGridOp.value);
+    engine.setGridType(envGridMode.value);
+
+    onEnvironmentChanged((env) => {
+      if (!engine) return;
+      engine.setBackgroundColor(env.backgroundColor);
+      engine.setGridColor(env.gridColor, env.gridOpacity);
+      engine.setGridType(env.gridMode);
+    });
   }
 }
 
@@ -158,9 +201,12 @@ watch(showGroundGrid, (newVal) => {
   engine?.toggleGroundGrid(newVal);
 });
 
-watch([activeRuler, strokeAnchor, radialCenter], () => {
+watch([activeRuler, strokeAnchor], () => {
   if (engine) {
-    engine.updateRulerGuides(activeRuler.value, strokeAnchor.value, radialCenter.value);
+    engine.updateRulerGuides(
+      activeRuler.value,
+      strokeAnchor.value
+    );
   }
 });
 
@@ -188,6 +234,7 @@ function onPointerDown(e: PointerEvent) {
 
   isInteracting.value = true;
   lastPointerPos = { x: e.clientX, y: e.clientY };
+  engine?.updateDomRect();
 
   if (isSpaceActive.value || isZActive.value) {
     return;
@@ -224,10 +271,10 @@ function onPointerMove(e: PointerEvent) {
   const dx = e.clientX - lastPointerPos.x;
   const dy = e.clientY - lastPointerPos.y;
 
-  // Space + Drag: Orbit Look
+  // Space + Drag: Orbit Look (Shift locks to 15-deg steps)
   if (isInteracting.value && isSpaceActive.value) {
     const rotSpeed = 0.0035;
-    engine.rotateCamera(-dx * rotSpeed, dy * rotSpeed);
+    engine.rotateCameraWithSnap(-dx * rotSpeed, dy * rotSpeed, e.shiftKey);
     lastPointerPos = { x: e.clientX, y: e.clientY };
     return;
   }
@@ -238,6 +285,17 @@ function onPointerMove(e: PointerEvent) {
     engine.zoomFov(dy * zoomSpeed);
     lastPointerPos = { x: e.clientX, y: e.clientY };
     return;
+  }
+
+  // Screen-space Orthogonal Snap (MediBang style: 0% distortion at any camera angle)
+  if (isInteracting.value && activeRuler.value !== 'none' && strokeAnchor.value && !isSpaceActive.value && !isZActive.value) {
+    const snapped = engine.snapRaycastToScreenOrthogonal(e.clientX, e.clientY, strokeAnchor.value, lockedScreenAxis, activeRuler.value);
+    if (snapped) {
+      lockedScreenAxis = snapped.lockedAxis;
+      continueStroke(snapped.pixelX, snapped.pixelY);
+      lastPointerPos = { x: e.clientX, y: e.clientY };
+      return;
+    }
   }
 
   // Normal Drawing Raycast
@@ -260,8 +318,12 @@ function onPointerMove(e: PointerEvent) {
   lastPointerPos = { x: e.clientX, y: e.clientY };
 }
 
+let lockedScreenAxis: 'x' | 'y' | null = null;
+
 function onPointerUp(e: PointerEvent) {
   if (appMode.value !== '360') return;
+
+  lockedScreenAxis = null;
 
   if (isCtrlAltResizing.value) {
     isCtrlAltResizing.value = false;
@@ -324,7 +386,10 @@ function onTouchEnd(e: TouchEvent) {
 </script>
 
 <template>
-  <div class="app-root">
+  <div class="app-root" :class="{ 'zen-mode-active': isZenMode }">
+    <!-- Zen Mode HUD Indicator -->
+    <ZenHudToast />
+
     <!-- Top Toolbar with Mode Switcher -->
     <TopToolbar />
 
@@ -359,6 +424,9 @@ function onTouchEnd(e: TouchEvent) {
         v-show="!isMobile || activeMobileTab === 'layer'"
         class="desktop-layer-sidebar"
       />
+
+      <!-- Inclinación & Presets Axonométricos Panel -->
+      <CameraPresetsPanel />
 
       <!-- Selection Marching Ants Overlay -->
       <SelectionOverlay />
@@ -625,6 +693,24 @@ function onTouchEnd(e: TouchEvent) {
     right: 8px;
     width: calc(100vw - 16px);
     max-height: 45vh;
+  }
+}
+
+// Modo Zen: Inmersión total (oculta UI flotante con transición suave)
+.zen-mode-active {
+  .desktop-tool-sidebar,
+  .desktop-layer-sidebar,
+  .top-toolbar-container,
+  .floating-bottom-dock,
+  .mobile-tabs,
+  .shading-overlay-ui,
+  .rotation-gizmo-container,
+  aside,
+  header {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(-6px) scale(0.98);
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 </style>

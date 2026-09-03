@@ -4,13 +4,28 @@ import type { RulerType, StrokePoint } from '../types/painting';
 const activeRuler = ref<RulerType>('none');
 const strokeAnchor = ref<StrokePoint | null>(null);
 
-// Radial (Vanishing Point) Center
-const radialCenter = ref<StrokePoint>({ x: 2048, y: 1024 });
-
 export function useRulers() {
   function setRuler(ruler: RulerType) {
     activeRuler.value = ruler;
     strokeAnchor.value = null;
+  }
+
+  function cycleRuler(): RulerType {
+    const next: Record<RulerType, RulerType> = {
+      none: 'orthogonal',
+      orthogonal: 'horizontal',
+      horizontal: 'vertical',
+      vertical: 'none',
+    };
+    const nextMode = next[activeRuler.value] || 'none';
+    setRuler(nextMode);
+    return nextMode;
+  }
+
+  function toggleRulerMode(mode: 'orthogonal' | 'horizontal' | 'vertical'): RulerType {
+    const nextMode = activeRuler.value === mode ? 'none' : mode;
+    setRuler(nextMode);
+    return nextMode;
   }
 
   function setStrokeAnchor(x: number, y: number) {
@@ -21,66 +36,18 @@ export function useRulers() {
     strokeAnchor.value = null;
   }
 
-  function setRadialCenter(center: StrokePoint) {
-    radialCenter.value = center;
-    activeRuler.value = 'radial';
-  }
-
-  /**
-   * Snaps a raw input point to the active ruler guide in 360 space.
-   */
-  function snapPoint(rawX: number, rawY: number, canvasWidth: number, canvasHeight: number): StrokePoint {
-    if (activeRuler.value === 'none') {
-      return { x: rawX, y: rawY };
-    }
-
-    // 1. Vertical Ruler: Locks azimuth/X to the initial anchor point while drawing vertically
-    if (activeRuler.value === 'vertical') {
-      const anchor = strokeAnchor.value || { x: rawX, y: rawY };
-      return {
-        x: Math.round(anchor.x),
-        y: Math.round(rawY)
-      };
-    }
-
-    // 2. Horizontal Ruler: Locks elevation/latitude/Y to the initial anchor point while drawing horizontally
-    if (activeRuler.value === 'horizontal') {
-      const anchor = strokeAnchor.value || { x: rawX, y: rawY };
-      return {
-        x: Math.round(rawX),
-        y: Math.round(anchor.y)
-      };
-    }
-
-    // 3. Radial (Vanishing point perspective) Ruler
-    if (activeRuler.value === 'radial') {
-      const cx = radialCenter.value.x;
-      const cy = radialCenter.value.y;
-
-      const dx = rawX - cx;
-      const dy = rawY - cy;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist === 0) return { x: rawX, y: rawY };
-
-      const angle = Math.atan2(dy, dx);
-      return {
-        x: Math.round(cx + Math.cos(angle) * dist),
-        y: Math.round(cy + Math.sin(angle) * dist)
-      };
-    }
-
-    return { x: rawX, y: rawY };
+  function snapPoint(rawX: number, rawY: number, _canvasWidth: number, _canvasHeight: number): StrokePoint {
+    return { x: Math.round(rawX), y: Math.round(rawY) };
   }
 
   return {
     activeRuler: computed(() => activeRuler.value),
     strokeAnchor: computed(() => strokeAnchor.value),
-    radialCenter: computed(() => radialCenter.value),
     setRuler,
+    cycleRuler,
+    toggleRulerMode,
     setStrokeAnchor,
     resetStrokeAnchor,
-    setRadialCenter,
     snapPoint
   };
 }

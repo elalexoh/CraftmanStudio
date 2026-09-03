@@ -59,7 +59,7 @@ let lastMidY = 0;
 export function usePainting() {
   const { layers, activeLayer, recomposeMaster, recomposeMasterImmediate, masterCanvas, masterCtx, canvasWidth, canvasHeight } = useLayers();
   const { selectionPoints, hasSelection, startLasso, continueLasso, endLasso, setSelectionState, applySelectionClip, clearInsideSelection } = useSelection();
-  const { snapPoint, setStrokeAnchor, resetStrokeAnchor } = useRulers();
+  const { activeRuler, strokeAnchor, setStrokeAnchor, resetStrokeAnchor, snapPoint } = useRulers();
 
   const currentSize = computed(() => toolSizes.value[currentTool.value] || 3);
 
@@ -108,6 +108,128 @@ export function usePainting() {
     }
   }
 
+  function pixelToSphereVec(px: number, py: number, w: number, h: number): [number, number, number] {
+    const u = (((px % w) + w) % w) / w;
+    const v = Math.max(0, Math.min(1, 1 - py / h));
+    const phi = (1 - v) * Math.PI;
+    const theta = u * Math.PI * 2;
+
+    const x = -Math.cos(theta) * Math.sin(phi);
+    const y = Math.cos(phi);
+    const z = Math.sin(theta) * Math.sin(phi);
+    return [x, y, z];
+  }
+
+  function sphereVecToPixel(vx: number, vy: number, vz: number, w: number, h: number): { x: number; y: number } {
+    const len = Math.hypot(vx, vy, vz) || 1;
+    const ny = Math.max(-1, Math.min(1, vy / len));
+    const phi = Math.acos(ny);
+    const v = 1 - phi / Math.PI;
+    const py = (1 - v) * h;
+
+    let theta = Math.atan2(vz, -vx);
+    if (theta < 0) theta += Math.PI * 2;
+    const u = theta / (Math.PI * 2);
+    const px = u * w;
+
+    return { x: px, y: py };
+  }
+
+  function slerpVec(v1: [number, number, number], v2: [number, number, number], t: number): [number, number, number] {
+    let dot = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+    dot = Math.max(-1, Math.min(1, dot));
+
+    if (dot > 0.9995) {
+      const rx = v1[0] + t * (v2[0] - v1[0]);
+      const ry = v1[1] + t * (v2[1] - v1[1]);
+      const rz = v1[2] + t * (v2[2] - v1[2]);
+      return [rx, ry, rz];
+    }
+
+    const theta = Math.acos(dot);
+    const sinTheta = Math.sin(theta);
+    if (Math.abs(sinTheta) < 0.0001) return v1;
+    const w1 = Math.sin((1 - t) * theta) / sinTheta;
+    const w2 = Math.sin(t * theta) / sinTheta;
+
+    return [
+      w1 * v1[0] + w2 * v2[0],
+      w1 * v1[1] + w2 * v2[1],
+      w1 * v1[2] + w2 * v2[2]
+    ];
+  }
+
+  function drawStraightLineWithWrap(
+    ctx: CanvasRenderingContext2D,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    canvasWidth: number,
+    canvasHeight: number,
+    is3DGeodesic: boolean = true
+  ) {
+    if (!is3DGeodesic) {
+      // 2D Flat Texture line
+      let adjustedX2 = x2;
+      const deltaX = adjustedX2 - x1;
+      if (deltaX < -canvasWidth / 2) {
+        adjustedX2 += canvasWidth;
+      } else if (deltaX > canvasWidth / 2) {
+        adjustedX2 -= canvasWidth;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(adjustedX2, y2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x1 - canvasWidth, y1);
+      ctx.lineTo(adjustedX2 - canvasWidth, y2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x1 + canvasWidth, y1);
+      ctx.lineTo(adjustedX2 + canvasWidth, y2);
+      ctx.stroke();
+      return;
+    }
+
+    // 3D Geodesic line: appears 100% straight on the 3D screen
+    const v1 = pixelToSphereVec(x1, y1, canvasWidth, canvasHeight);
+    const v2 = pixelToSphereVec(x2, y2, canvasWidth, canvasHeight);
+
+    const segments = 64;
+    let prevPt = sphereVecToPixel(v1[0], v1[1], v1[2], canvasWidth, canvasHeight);
+
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const vt = slerpVec(v1, v2, t);
+      const currPt = sphereVecToPixel(vt[0], vt[1], vt[2], canvasWidth, canvasHeight);
+
+      const deltaX = currPt.x - prevPt.x;
+      if (Math.abs(deltaX) < canvasWidth / 2) {
+        ctx.beginPath();
+        ctx.moveTo(prevPt.x, prevPt.y);
+        ctx.lineTo(currPt.x, currPt.y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(prevPt.x - canvasWidth, prevPt.y);
+        ctx.lineTo(currPt.x - canvasWidth, currPt.y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(prevPt.x + canvasWidth, prevPt.y);
+        ctx.lineTo(currPt.x + canvasWidth, currPt.y);
+        ctx.stroke();
+      }
+
+      prevPt = currPt;
+    }
+  }
+
   function startStroke(rawX: number, rawY: number) {
     // 1. Lasso Tool Handling
     if (currentTool.value === 'lasso') {
@@ -124,7 +246,7 @@ export function usePainting() {
     const pixelX = snapped.x;
     const pixelY = snapped.y;
 
-    // Save before-state snapshot for undo
+    // Capture Undo snapshot before stroke starts
     try {
       beforeImageData = layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height);
     } catch (e) {
@@ -237,30 +359,59 @@ export function usePainting() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // 1. Center curve
-    ctx.beginPath();
-    ctx.moveTo(lastMidX, lastMidY);
-    ctx.quadraticCurveTo(lastX, lastY, midX, midY);
-    ctx.stroke();
+    if (activeRuler.value !== 'none') {
+      // Strict linear path for rulers: 0% wobble
+      // 1. Center line
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(adjustedX, pixelY);
+      ctx.stroke();
 
-    // 2. Left copy (-width)
-    ctx.beginPath();
-    ctx.moveTo(lastMidX - width, lastMidY);
-    ctx.quadraticCurveTo(lastX - width, lastY, midX - width, midY);
-    ctx.stroke();
+      // 2. Left copy (-width)
+      ctx.beginPath();
+      ctx.moveTo(lastX - width, lastY);
+      ctx.lineTo(adjustedX - width, pixelY);
+      ctx.stroke();
 
-    // 3. Right copy (+width)
-    ctx.beginPath();
-    ctx.moveTo(lastMidX + width, lastMidY);
-    ctx.quadraticCurveTo(lastX + width, lastY, midX + width, midY);
-    ctx.stroke();
+      // 3. Right copy (+width)
+      ctx.beginPath();
+      ctx.moveTo(lastX + width, lastY);
+      ctx.lineTo(adjustedX + width, pixelY);
+      ctx.stroke();
 
-    ctx.restore();
+      ctx.restore();
 
-    lastMidX = midX;
-    lastMidY = midY;
-    lastX = adjustedX;
-    lastY = pixelY;
+      lastX = adjustedX;
+      lastY = pixelY;
+      lastMidX = adjustedX;
+      lastMidY = pixelY;
+    } else {
+      // Freehand drawing: Smooth quadratic curve
+      // 1. Center curve
+      ctx.beginPath();
+      ctx.moveTo(lastMidX, lastMidY);
+      ctx.quadraticCurveTo(lastX, lastY, midX, midY);
+      ctx.stroke();
+
+      // 2. Left copy (-width)
+      ctx.beginPath();
+      ctx.moveTo(lastMidX - width, lastMidY);
+      ctx.quadraticCurveTo(lastX - width, lastY, midX - width, midY);
+      ctx.stroke();
+
+      // 3. Right copy (+width)
+      ctx.beginPath();
+      ctx.moveTo(lastMidX + width, lastMidY);
+      ctx.quadraticCurveTo(lastX + width, lastY, midX + width, midY);
+      ctx.stroke();
+
+      ctx.restore();
+
+      lastMidX = midX;
+      lastMidY = midY;
+      lastX = adjustedX;
+      lastY = pixelY;
+    }
 
     // Normalize coordinates into canvas range [0, width)
     if (lastX < 0) {
@@ -297,6 +448,7 @@ export function usePainting() {
     isPainting = false;
 
     const layer = activeLayer.value;
+
     if (layer && beforeImageData) {
       try {
         const afterImageData = layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height);

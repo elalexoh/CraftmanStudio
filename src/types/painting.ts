@@ -1,6 +1,6 @@
-export type ToolType = 'pen' | 'eraser' | 'bucket' | 'eyedropper' | 'lasso' | 'ruler_line' | 'ruler_radial';
+export type ToolType = 'pen' | 'eraser' | 'bucket' | 'eyedropper' | 'lasso';
 
-export type RulerType = 'none' | 'vertical' | 'horizontal' | 'radial';
+export type RulerType = 'none' | 'orthogonal' | 'horizontal' | 'vertical';
 
 export type Language = 'es' | 'en' | 'ja';
 
@@ -28,50 +28,23 @@ export interface StrokePoint {
   y: number;
 }
 
-export interface TileDiff {
-  tileX: number;
-  tileY: number;
-  before: ImageData;
-  after: ImageData;
+export interface HistoryStep {
+  type: 'layer' | 'selection';
+  layerId?: string;
+  before?: ImageData | null;
+  after?: ImageData | null;
+  beforePoints?: StrokePoint[];
+  afterPoints?: StrokePoint[];
+  beforeHasSel?: boolean;
+  afterHasSel?: boolean;
+  beforeInverted?: boolean;
+  afterInverted?: boolean;
 }
-
-export interface StrokeAction {
-  historyType: 'stroke';
-  layerId: string;
-  tool: ToolType;
-  color: string;
-  size: number;
-  points: StrokePoint[];
-  tileDiffs?: Map<string, { before: ImageData; after: ImageData }>;
-}
-
-export interface LayerHistoryAction {
-  historyType: 'layer_add' | 'layer_delete' | 'layer_reorder' | 'layer_visibility' | 'layer_opacity' | 'layer_rename';
-  layerId: string;
-  previousState?: any;
-  newState?: any;
-}
-
-export type HistoryAction = StrokeAction | LayerHistoryAction;
 
 export interface ProjectData {
-  version: number;
-  width: number;
-  height: number;
+  version: string;
+  resolution: CanvasResolution;
   eyeHeight: number;
-  groundGrid: boolean;
-  activeLayerId: string;
   layers: SerializedLayer[];
-  recentColors?: string[];
-  camera?: {
-    yaw: number;
-    pitch: number;
-    fov: number;
-  };
-}
-
-export interface ColorHSV {
-  h: number; // 0 - 360
-  s: number; // 0 - 100
-  v: number; // 0 - 100
+  recentColors: string[];
 }
