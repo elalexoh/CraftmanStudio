@@ -133,13 +133,16 @@ export class PanoramicEngine {
     const fragmentShader = `
       varying vec3 vWorldPosition;
       uniform float gridSize;
-      uniform int gridType; // 0: standard, 1: isometric, 2: axonometric 45deg
+      uniform int gridType; // 0: standard, 1: isometric, 2: curvilinear, 3: 1-point, 4: 2-point, 5: polar
+      uniform vec3 gridColor;
+      uniform float gridOpacity;
+
       void main() {
         vec2 p = vWorldPosition.xz / gridSize;
         float line = 0.0;
 
         if (gridType == 1) {
-          // Isometric 3-axis grid (0 deg, 60 deg, 120 deg)
+          // 1. Isometric 3-axis grid (0 deg, 60 deg, 120 deg)
           mat2 rot60 = mat2(0.5, -0.866025, 0.866025, 0.5);
           mat2 rot120 = mat2(-0.5, -0.866025, 0.866025, -0.5);
           vec2 p2 = rot60 * p;
@@ -151,19 +154,40 @@ export class PanoramicEngine {
 
           line = max(max(1.0 - min(d1, 1.0), 1.0 - min(d2, 1.0)), 1.0 - min(d3, 1.0));
         } else if (gridType == 2) {
-          // 45 degree diamond grid
-          mat2 rot45 = mat2(0.707106, -0.707106, 0.707106, 0.707106);
-          vec2 p45 = rot45 * p;
-          vec2 d = abs(fract(p45 - 0.5) - 0.5) / fwidth(p45);
-          line = 1.0 - min(min(d.x, d.y), 1.0);
+          // 2. Curvilinear 360 Fisheye Perspective
+          float r = length(p);
+          float curvFactor = 1.0 / (1.0 + r * 0.02);
+          vec2 cp = p * curvFactor;
+          vec2 dCurv = abs(fract(cp - 0.5) - 0.5) / fwidth(cp);
+          line = 1.0 - min(min(dCurv.x, dCurv.y), 1.0);
+        } else if (gridType == 3) {
+          // 3. 1-Point Perspective (Central vanishing convergence)
+          float depth = p.y;
+          float angle = atan(p.x, abs(p.y) + 0.1) / 3.14159265;
+          float dDepth = abs(fract(depth - 0.5) - 0.5) / fwidth(depth);
+          float dRay = abs(fract(angle * 16.0 - 0.5) - 0.5) / fwidth(angle * 16.0);
+          line = max(1.0 - min(dDepth, 1.0), 1.0 - min(dRay, 1.0));
+        } else if (gridType == 4) {
+          // 4. 2-Point Perspective (Left and right horizon vanishing points)
+          float ang1 = atan(p.y, p.x + 40.0) / 3.14159265;
+          float ang2 = atan(p.y, p.x - 40.0) / 3.14159265;
+          float l1 = 1.0 - min(abs(fract(ang1 * 24.0 - 0.5) - 0.5) / fwidth(ang1 * 24.0), 1.0);
+          float l2 = 1.0 - min(abs(fract(ang2 * 24.0 - 0.5) - 0.5) / fwidth(ang2 * 24.0), 1.0);
+          line = max(l1, l2);
+        } else if (gridType == 5) {
+          // 5. Polar Concéntrico (Rings & Spokes)
+          float r = length(p);
+          float theta = atan(p.y, p.x) / (2.0 * 3.14159265);
+          float ring = 1.0 - min(abs(fract(r - 0.5) - 0.5) / fwidth(r), 1.0);
+          float spoke = 1.0 - min(abs(fract(theta * 24.0 - 0.5) - 0.5) / fwidth(theta * 24.0), 1.0);
+          line = max(ring, spoke);
         } else {
-          // Standard cartesian grid
+          // 0. Standard cartesian grid
           vec2 d = abs(fract(p - 0.5) - 0.5) / fwidth(p);
           line = 1.0 - min(min(d.x, d.y), 1.0);
         }
 
-        vec3 gridColor = vec3(0.25, 0.55, 1.0);
-        gl_FragColor = vec4(gridColor, line * 0.38);
+        gl_FragColor = vec4(gridColor, line * gridOpacity);
       }
     `;
 
@@ -171,7 +195,9 @@ export class PanoramicEngine {
     this.groundGridMaterial = new THREE.ShaderMaterial({
       uniforms: {
         gridSize: { value: Math.sqrt(this.eyeHeight / 1.5) },
-        gridType: { value: 0 }
+        gridType: { value: 0 },
+        gridColor: { value: new THREE.Color(0x06b6d4) },
+        gridOpacity: { value: 0.4 }
       },
       transparent: true,
       depthTest: false,
@@ -286,10 +312,49 @@ export class PanoramicEngine {
     if (this.horizonGuide) this.horizonGuide.visible = show;
   }
 
-  public setGridType(type: 'standard' | 'isometric' | 'axonometric') {
+  public setBackgroundColor(colorHex: string) {
+    const col = new THREE.Color(colorHex);
+    this.scene.background = col;
+    this.renderer.setClearColor(col, 1.0);
+  }
+
+  public setGridColor(colorHex: string, opacity?: number) {
+    const col = new THREE.Color(colorHex);
+    if (this.groundGridMaterial) {
+      this.groundGridMaterial.uniforms.gridColor.value = col;
+      if (opacity !== undefined) {
+        this.groundGridMaterial.uniforms.gridOpacity.value = opacity;
+      }
+    }
+    if (this.verticalGuidesMesh) {
+      const mat = this.verticalGuidesMesh.material as THREE.LineBasicMaterial;
+      mat.color.copy(col);
+      if (opacity !== undefined) mat.opacity = opacity * 0.5;
+    }
+    if (this.horizonGuide) {
+      const mat = this.horizonGuide.material as THREE.LineBasicMaterial;
+      mat.color.copy(col);
+    }
+  }
+
+  public setGridOpacity(opacity: number) {
+    if (this.groundGridMaterial) {
+      this.groundGridMaterial.uniforms.gridOpacity.value = Math.max(0.05, Math.min(1.0, opacity));
+    }
+    if (this.verticalGuidesMesh) {
+      const mat = this.verticalGuidesMesh.material as THREE.LineBasicMaterial;
+      mat.opacity = opacity * 0.5;
+    }
+  }
+
+  public setGridType(type: 'standard' | 'isometric' | 'curvilinear' | 'one_point' | 'two_point' | 'polar' | string) {
     let val = 0;
     if (type === 'isometric') val = 1;
-    else if (type === 'axonometric') val = 2;
+    else if (type === 'curvilinear' || type === 'axonometric') val = 2;
+    else if (type === 'one_point') val = 3;
+    else if (type === 'two_point') val = 4;
+    else if (type === 'polar') val = 5;
+
     if (this.groundGridMaterial) {
       this.groundGridMaterial.uniforms.gridType.value = val;
     }

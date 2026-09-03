@@ -34,6 +34,7 @@ import { useHotkeys, isSpaceActive, isZActive } from './composables/useHotkeys';
 import { useRulers } from './composables/useRulers';
 import { useSelection } from './composables/useSelection';
 import { useCameraPresets, onOrientationRequested } from './composables/useCameraPresets';
+import { useEnvironmentSettings, onEnvironmentChanged } from './composables/useEnvironmentSettings';
 import { useZenMode } from './composables/useZenMode';
 
 import FloatingBottomDock from './components/FloatingBottomDock.vue';
@@ -127,6 +128,14 @@ function init360Engine() {
       } else {
         engine.setOrientationDeg(targetOrientation.yaw, targetOrientation.pitch, targetOrientation.roll);
       }
+    });
+
+    // Listen to environment settings (background color, grid color, grid mode)
+    onEnvironmentChanged((env) => {
+      if (!engine) return;
+      engine.setBackgroundColor(env.backgroundColor);
+      engine.setGridColor(env.gridColor, env.gridOpacity);
+      engine.setGridType(env.gridMode);
     });
   }
 }

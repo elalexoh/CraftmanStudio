@@ -15,13 +15,13 @@ export interface CameraBookmark {
   orientation: CameraOrientation;
 }
 
-// Valores canónicos estándar en grados
+// Valores canónicos estándar en grados (vista en picado / desde arriba hacia el plano de suelo)
 export const PRESET_CONFIGS: Record<AxonometricPreset, CameraOrientation | null> = {
   free: null,
-  isometric: { yaw: 45, pitch: 35.264, roll: 0 },
-  dimetric: { yaw: 26.565, pitch: 20.0, roll: 0 },
-  cavalier: { yaw: 45, pitch: 0.0, roll: 0 },
-  military: { yaw: 45, pitch: 45.0, roll: 0 },
+  isometric: { yaw: 45, pitch: -35.264, roll: 0 },
+  dimetric: { yaw: 26.565, pitch: -20.0, roll: 0 },
+  cavalier: { yaw: 45, pitch: -30.0, roll: 0 },
+  military: { yaw: 45, pitch: -45.0, roll: 0 },
 };
 
 const currentPreset = ref<AxonometricPreset>('free');
@@ -35,10 +35,10 @@ const isPresetsPanelOpen = ref<boolean>(false);
 
 // 4 slots de bookmarks por defecto
 const bookmarks = ref<CameraBookmark[]>([
-  { id: 1, label: 'Vista 1', preset: 'isometric', orientation: { yaw: 45, pitch: 35.264, roll: 0 } },
-  { id: 2, label: 'Vista 2', preset: 'military', orientation: { yaw: 45, pitch: 45, roll: 0 } },
-  { id: 3, label: 'Vista 3', preset: 'cavalier', orientation: { yaw: 45, pitch: 0, roll: 0 } },
-  { id: 4, label: 'Vista 4', preset: 'dimetric', orientation: { yaw: 26.565, pitch: 20, roll: 0 } },
+  { id: 1, label: 'Vista 1', preset: 'isometric', orientation: { yaw: 45, pitch: -35.264, roll: 0 } },
+  { id: 2, label: 'Vista 2', preset: 'military', orientation: { yaw: 45, pitch: -45, roll: 0 } },
+  { id: 3, label: 'Vista 3', preset: 'cavalier', orientation: { yaw: 45, pitch: -30, roll: 0 } },
+  { id: 4, label: 'Vista 4', preset: 'dimetric', orientation: { yaw: 26.565, pitch: -20, roll: 0 } },
 ]);
 
 // Callbacks para sincronizar con el motor 3D sin acoplar
