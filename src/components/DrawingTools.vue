@@ -118,13 +118,13 @@ function adjustSize(delta: number) {
         <span>Voltear V</span>
       </button>
       <button
-        class="flip-btn"
+        class="flip-btn full-width-btn"
         :class="{ active: isPresetsPanelOpen }"
         title="Inclinación y Proyecciones Axonométricas"
         @click="togglePresetsPanel"
       >
         <Compass :size="14" />
-        <span>Inclinación</span>
+        <span>Inclinación & Proyección</span>
       </button>
     </div>
 
@@ -236,6 +236,12 @@ function adjustSize(delta: number) {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 5px;
+
+  .full-width-btn {
+    grid-column: span 2;
+    padding: 6px 8px;
+    font-weight: 600;
+  }
 }
 
 .flip-btn {
@@ -258,6 +264,13 @@ function adjustSize(delta: number) {
     background: #f1f5f9;
     border-color: #94a3b8;
     color: #0f172a;
+  }
+
+  &.active {
+    background: #eff6ff;
+    border-color: #2563eb;
+    color: #2563eb;
+    font-weight: 700;
   }
 
   &:active {
