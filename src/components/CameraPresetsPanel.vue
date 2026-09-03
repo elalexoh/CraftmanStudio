@@ -15,7 +15,8 @@ import {
   Lock,
   Layers,
   Save,
-  Check
+  Check,
+  X
 } from 'lucide-vue-next';
 
 const {
@@ -29,6 +30,7 @@ const {
   saveBookmark,
   loadBookmark,
   togglePresetsPanel,
+  setPresetsPanelOpen,
 } = useCameraPresets();
 
 const isCollapsed = ref(false);
@@ -85,24 +87,31 @@ const handleSaveSlot = (slotId: number) => {
 <template>
   <div
     v-if="isPresetsPanelOpen"
-    class="fixed top-14 right-4 z-40 w-72 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/60 rounded-xl shadow-2xl text-zinc-100 overflow-hidden transition-all duration-200"
+    class="fixed top-[60px] left-[236px] max-md:left-4 max-md:right-4 max-md:top-16 z-[95] w-72 max-md:w-auto bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/70 rounded-xl shadow-2xl text-zinc-100 overflow-hidden transition-all duration-200"
   >
     <!-- Header -->
     <div
-      class="flex items-center justify-between px-3.5 py-2.5 bg-zinc-800/60 border-b border-zinc-700/50 cursor-pointer select-none"
-      @click="isCollapsed = !isCollapsed"
+      class="flex items-center justify-between px-3.5 py-2.5 bg-zinc-800/80 border-b border-zinc-700/60 select-none"
     >
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 cursor-pointer flex-1" @click="isCollapsed = !isCollapsed">
         <Compass class="w-4 h-4 text-cyan-400" />
         <span class="text-xs font-semibold tracking-wide text-zinc-200">Inclinación & Proyección</span>
       </div>
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1">
         <button
           class="text-zinc-400 hover:text-zinc-100 p-1 rounded hover:bg-zinc-700/50 transition-colors"
           :title="isCollapsed ? 'Expandir' : 'Colapsar'"
+          @click="isCollapsed = !isCollapsed"
         >
           <ChevronUp v-if="!isCollapsed" class="w-3.5 h-3.5" />
           <ChevronDown v-else class="w-3.5 h-3.5" />
+        </button>
+        <button
+          class="text-zinc-400 hover:text-red-400 p-1 rounded hover:bg-zinc-700/50 transition-colors"
+          title="Cerrar panel"
+          @click="setPresetsPanelOpen(false)"
+        >
+          <X class="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
