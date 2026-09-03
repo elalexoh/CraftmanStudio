@@ -36,9 +36,9 @@ export const GRID_MODE_OPTIONS: { id: GridMode; label: string; desc: string }[] 
   { id: 'polar', label: 'Polar Concéntrica', desc: 'Anillos concéntricos y rayos radiales' },
 ];
 
-const backgroundColor = ref('#cfcbcb');
-const gridColor = ref('#000000');
-const gridOpacity = ref(0.20);
+const backgroundColor = ref('#f1f5f9');
+const gridColor = ref('#06b6d4');
+const gridOpacity = ref(0.38);
 const gridMode = ref<GridMode>('standard');
 
 type EnvCallback = (settings: {
