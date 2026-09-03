@@ -7,7 +7,19 @@ import { useProjectStorage } from '../composables/useProjectStorage';
 import { useI18n } from '../composables/useI18n';
 import { isHotkeysModalOpen } from '../composables/useHotkeys';
 import type { CanvasResolution, Language } from '../types/painting';
-import { Undo2, Redo2, HelpCircle, Eye, Download, Upload, Keyboard, Save } from 'lucide-vue-next';
+import {
+  Undo2,
+  Redo2,
+  HelpCircle,
+  Eye,
+  Download,
+  Upload,
+  Keyboard,
+  Save,
+  ChevronDown,
+  Layers,
+  FileImage
+} from 'lucide-vue-next';
 
 const { canUndo, canRedo, undo, redo } = usePainting();
 const { setCanvasResolution } = useLayers();
@@ -24,10 +36,22 @@ const {
   setResolution,
   toggleAutoSave
 } = useAppState();
-const { saveProjectToFile, loadProjectFromFile } = useProjectStorage();
+const { exportPsd, exportPng, exportPngTransparent, loadProjectFromFile } = useProjectStorage();
 const { currentLanguage, setLanguage, t } = useI18n();
 
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const isExportDropdownOpen = ref(false);
+
+function handleExport(format: 'psd' | 'png-trans' | 'png-white') {
+  isExportDropdownOpen.value = false;
+  if (format === 'psd') {
+    exportPsd();
+  } else if (format === 'png-trans') {
+    exportPngTransparent();
+  } else if (format === 'png-white') {
+    exportPng();
+  }
+}
 
 function onResolutionChange(e: Event) {
   const target = e.target as HTMLSelectElement;
@@ -176,19 +200,51 @@ async function onFileSelected(e: Event) {
         <span>{{ autoSaveEnabled ? 'Auto-guardado: ON' : 'Auto-guardado: OFF' }}</span>
       </button>
 
-      <button class="btn-action" @click="saveProjectToFile('painting.gururi')">
-        <Download :size="14" />
-        <span>{{ t('saveProject') }}</span>
-      </button>
+      <!-- Export Dropdown -->
+      <div class="export-dropdown-wrapper">
+        <button
+          class="btn-action btn-export-main"
+          :title="t('exportOptions')"
+          @click="isExportDropdownOpen = !isExportDropdownOpen"
+        >
+          <Download :size="14" />
+          <span>{{ t('saveProject') }}</span>
+          <ChevronDown :size="12" />
+        </button>
 
-      <button class="btn-action" @click="triggerLoadFile">
+        <div v-if="isExportDropdownOpen" class="export-dropdown-menu">
+          <button class="dropdown-item" @click="handleExport('psd')">
+            <Layers :size="15" class="item-icon psd-icon" />
+            <div class="item-text">
+              <span class="item-title">{{ t('exportPsd') }}</span>
+              <span class="item-desc">Formato universal con capas editables (.psd)</span>
+            </div>
+          </button>
+          <button class="dropdown-item" @click="handleExport('png-trans')">
+            <FileImage :size="15" class="item-icon" />
+            <div class="item-text">
+              <span class="item-title">{{ t('exportPngTrans') }}</span>
+              <span class="item-desc">PNG plano con canal alfa transparente</span>
+            </div>
+          </button>
+          <button class="dropdown-item" @click="handleExport('png-white')">
+            <FileImage :size="15" class="item-icon" />
+            <div class="item-text">
+              <span class="item-title">{{ t('exportPngWhite') }}</span>
+              <span class="item-desc">PNG plano con fondo blanco para visores 360°</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn-action" :title="t('loadProject')" @click="triggerLoadFile">
         <Upload :size="14" />
         <span>{{ t('loadProject') }}</span>
       </button>
       <input
         ref="fileInputRef"
         type="file"
-        accept=".gururi,application/json"
+        accept=".psd,.gururi,application/json,image/*"
         class="hidden-file"
         @change="onFileSelected"
       />
@@ -489,6 +545,95 @@ async function onFileSelected(e: Event) {
 
 .hidden-file {
   display: none;
+}
+
+.export-dropdown-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-export-main {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #f1f5f9;
+
+    .item-title {
+      color: #2563eb;
+    }
+  }
+
+  .item-icon {
+    margin-top: 2px;
+    color: #64748b;
+    flex-shrink: 0;
+
+    &.psd-icon {
+      color: #0284c7;
+    }
+  }
+
+  .item-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .item-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .item-desc {
+    font-size: 10px;
+    color: #64748b;
+    line-height: 1.3;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 900px) {
