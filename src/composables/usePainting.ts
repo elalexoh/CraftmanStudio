@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import type { ToolType, StrokePoint, HistoryAction } from '../types/painting';
+import type { ToolType, StrokePoint } from '../types/painting';
 import { useLayers } from './useLayers';
 import { useSelection } from './useSelection';
 import { useRulers } from './useRulers';
@@ -12,9 +12,7 @@ function loadToolSizesFromStorage(): Record<ToolType, number> {
     eraser: 15,
     bucket: 1,
     eyedropper: 1,
-    lasso: 1,
-    ruler_line: 3,
-    ruler_radial: 3
+    lasso: 1
   };
   try {
     const raw = localStorage.getItem(TOOL_SIZES_STORAGE_KEY);
