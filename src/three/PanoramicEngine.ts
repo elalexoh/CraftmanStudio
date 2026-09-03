@@ -84,8 +84,10 @@ export class PanoramicEngine {
 
     this.setupGroundGrid();
     this.setupEraserCursor();
+    this.setupRulerGuides();
     this.scene.add(this.rulerGuideGroup);
     this.updateCameraDirection();
+    this.updateDomRect();
     this.startRenderLoop();
 
     window.addEventListener('resize', this.onResize);
@@ -396,6 +398,14 @@ export class PanoramicEngine {
   }
 
   private rulerGuideGroup: THREE.Group = new THREE.Group();
+  private rulerLineHMesh: THREE.Line | null = null;
+  private rulerLineVMesh: THREE.Line | null = null;
+  private domRect: DOMRect | null = null;
+
+  private _scratchDir = new THREE.Vector3();
+  private _scratchAnchor3D = new THREE.Vector3();
+  private _scratchAnchorNDC = new THREE.Vector3();
+
   private rulerLineMaterial = new THREE.LineBasicMaterial({
     color: 0x06b6d4, // Bright cyan
     transparent: true,
@@ -404,81 +414,96 @@ export class PanoramicEngine {
     depthWrite: false
   });
 
+  private setupRulerGuides() {
+    const segments = 24;
+    const ptsH: THREE.Vector3[] = [];
+    const ptsV: THREE.Vector3[] = [];
+    for (let i = 0; i <= segments; i++) {
+      ptsH.push(new THREE.Vector3());
+      ptsV.push(new THREE.Vector3());
+    }
+
+    const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
+    this.rulerLineHMesh = new THREE.Line(geomH, this.rulerLineMaterial);
+    this.rulerLineHMesh.renderOrder = 20;
+    this.rulerLineHMesh.visible = false;
+    this.rulerLineHMesh.frustumCulled = false;
+    this.rulerGuideGroup.add(this.rulerLineHMesh);
+
+    const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
+    this.rulerLineVMesh = new THREE.Line(geomV, this.rulerLineMaterial);
+    this.rulerLineVMesh.renderOrder = 20;
+    this.rulerLineVMesh.visible = false;
+    this.rulerLineVMesh.frustumCulled = false;
+    this.rulerGuideGroup.add(this.rulerLineVMesh);
+  }
+
+  public updateDomRect() {
+    if (this.renderer?.domElement) {
+      this.domRect = this.renderer.domElement.getBoundingClientRect();
+    }
+  }
+
   public updateRulerGuides(
     rulerType: string,
     anchor?: { x: number; y: number } | null
   ) {
-    // Clear previous ruler objects and dispose geometries
-    while (this.rulerGuideGroup.children.length > 0) {
-      const obj = this.rulerGuideGroup.children[0] as THREE.Line;
-      if (obj && obj.geometry) {
-        obj.geometry.dispose();
-      }
-      this.rulerGuideGroup.remove(obj);
-    }
-
     if (rulerType === 'none' || !this.masterCanvas || !anchor) {
+      if (this.rulerLineHMesh) this.rulerLineHMesh.visible = false;
+      if (this.rulerLineVMesh) this.rulerLineVMesh.visible = false;
       return;
     }
 
     const w = this.masterCanvas.width;
     const h = this.masterCanvas.height;
 
-    const pixelToSphere = (px: number, py: number): THREE.Vector3 => {
-      const u = ((px % w) + w) % w / w;
-      const v = Math.max(0, Math.min(1, 1 - py / h));
-      const phi = (1 - v) * Math.PI;
-      const theta = u * Math.PI * 2;
+    const u = (((anchor.x % w) + w) % w) / w;
+    const v = Math.max(0, Math.min(1, 1 - anchor.y / h));
+    const phi = (1 - v) * Math.PI;
+    const theta = u * Math.PI * 2;
+    const r = 49.5;
 
-      const r = 49.5;
-      const x = -r * Math.cos(theta) * Math.sin(phi);
-      const y = r * Math.cos(phi);
-      const z = r * Math.sin(theta) * Math.sin(phi);
-      return new THREE.Vector3(x, y, z);
-    };
-
-    const lineMaterial = this.rulerLineMaterial;
-    const anchor3D = pixelToSphere(anchor.x, anchor.y);
-    const anchorNDC = anchor3D.clone().project(this.camera);
+    this._scratchAnchor3D.set(
+      -r * Math.cos(theta) * Math.sin(phi),
+      r * Math.cos(phi),
+      r * Math.sin(theta) * Math.sin(phi)
+    );
+    this._scratchAnchorNDC.copy(this._scratchAnchor3D).project(this.camera);
 
     const showH = rulerType === 'orthogonal' || rulerType === 'horizontal';
     const showV = rulerType === 'orthogonal' || rulerType === 'vertical';
 
     // 1. Screen Horizontal guide line (fixed y = anchorNDC.y)
-    if (showH) {
-      const ptsH: THREE.Vector3[] = [];
-      for (let i = 0; i <= 24; i++) {
-        const ndcX = -1 + (i / 24) * 2;
-        const dir = new THREE.Vector3(ndcX, anchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-        const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
-        if (hit) {
-          ptsH.push(hit.point);
+    if (this.rulerLineHMesh) {
+      this.rulerLineHMesh.visible = showH;
+      if (showH) {
+        const posAttr = this.rulerLineHMesh.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i <= 24; i++) {
+          const ndcX = -1 + (i / 24) * 2;
+          this._scratchDir.set(ndcX, this._scratchAnchorNDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+          const hit = this.intersectRaySphere(this.camera.position, this._scratchDir, 49.5);
+          if (hit) {
+            posAttr.setXYZ(i, hit.point.x, hit.point.y, hit.point.z);
+          }
         }
-      }
-      if (ptsH.length > 1) {
-        const geomH = new THREE.BufferGeometry().setFromPoints(ptsH);
-        const lineH = new THREE.Line(geomH, lineMaterial);
-        lineH.renderOrder = 20;
-        this.rulerGuideGroup.add(lineH);
+        posAttr.needsUpdate = true;
       }
     }
 
     // 2. Screen Vertical guide line (fixed x = anchorNDC.x)
-    if (showV) {
-      const ptsV: THREE.Vector3[] = [];
-      for (let i = 0; i <= 24; i++) {
-        const ndcY = -1 + (i / 24) * 2;
-        const dir = new THREE.Vector3(anchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-        const hit = this.intersectRaySphere(this.camera.position, dir, 49.5);
-        if (hit) {
-          ptsV.push(hit.point);
+    if (this.rulerLineVMesh) {
+      this.rulerLineVMesh.visible = showV;
+      if (showV) {
+        const posAttr = this.rulerLineVMesh.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i <= 24; i++) {
+          const ndcY = -1 + (i / 24) * 2;
+          this._scratchDir.set(this._scratchAnchorNDC.x, ndcY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+          const hit = this.intersectRaySphere(this.camera.position, this._scratchDir, 49.5);
+          if (hit) {
+            posAttr.setXYZ(i, hit.point.x, hit.point.y, hit.point.z);
+          }
         }
-      }
-      if (ptsV.length > 1) {
-        const geomV = new THREE.BufferGeometry().setFromPoints(ptsV);
-        const lineV = new THREE.Line(geomV, lineMaterial);
-        lineV.renderOrder = 20;
-        this.rulerGuideGroup.add(lineV);
+        posAttr.needsUpdate = true;
       }
     }
   }
@@ -822,17 +847,17 @@ export class PanoramicEngine {
     const theta = u * Math.PI * 2;
     const r = 50;
 
-    const anchor3D = new THREE.Vector3(
+    this._scratchAnchor3D.set(
       -r * Math.cos(theta) * Math.sin(phi),
       r * Math.cos(phi),
       r * Math.sin(theta) * Math.sin(phi)
     );
 
     // 2. Project anchor to physical screen pixel coordinates
-    const anchorNDC = anchor3D.clone().project(this.camera);
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    const anchorScreenX = ((anchorNDC.x + 1) / 2) * rect.width + rect.left;
-    const anchorScreenY = ((-anchorNDC.y + 1) / 2) * rect.height + rect.top;
+    this._scratchAnchorNDC.copy(this._scratchAnchor3D).project(this.camera);
+    const rect = this.domRect || this.renderer.domElement.getBoundingClientRect();
+    const anchorScreenX = ((this._scratchAnchorNDC.x + 1) / 2) * rect.width + rect.left;
+    const anchorScreenY = ((-this._scratchAnchorNDC.y + 1) / 2) * rect.height + rect.top;
 
     // 3. Delta in physical screen pixels (1:1 uniform aspect ratio)
     const deltaPxX = clientX - anchorScreenX;
@@ -857,11 +882,11 @@ export class PanoramicEngine {
     const currNDCX = ((clientX - rect.left) / rect.width) * 2 - 1;
     const currNDCY = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-    const targetNDCX = axis === 'x' ? currNDCX : anchorNDC.x;
-    const targetNDCY = axis === 'y' ? currNDCY : anchorNDC.y;
+    const targetNDCX = axis === 'x' ? currNDCX : this._scratchAnchorNDC.x;
+    const targetNDCY = axis === 'y' ? currNDCY : this._scratchAnchorNDC.y;
 
-    const dir = new THREE.Vector3(targetNDCX, targetNDCY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-    const hit = this.intersectRaySphere(this.camera.position, dir, 50);
+    this._scratchDir.set(targetNDCX, targetNDCY, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+    const hit = this.intersectRaySphere(this.camera.position, this._scratchDir, 50);
 
     if (hit) {
       const px = Math.floor(hit.uv.x * canvasWidth);
@@ -884,6 +909,7 @@ export class PanoramicEngine {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.updateDomRect();
   };
 
   private startRenderLoop() {

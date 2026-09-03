@@ -229,6 +229,7 @@ function onPointerDown(e: PointerEvent) {
 
   isInteracting.value = true;
   lastPointerPos = { x: e.clientX, y: e.clientY };
+  engine?.updateDomRect();
 
   if (isSpaceActive.value || isZActive.value) {
     return;
