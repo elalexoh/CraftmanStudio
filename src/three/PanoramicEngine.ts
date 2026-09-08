@@ -7,6 +7,12 @@ export interface RaycastResult {
   pixelY: number;
 }
 
+let activePanoramicEngine: PanoramicEngine | null = null;
+
+export function getActivePanoramicEngine(): PanoramicEngine | null {
+  return activePanoramicEngine;
+}
+
 export class PanoramicEngine {
   private container: HTMLElement;
   public scene: THREE.Scene;
@@ -48,6 +54,7 @@ export class PanoramicEngine {
   private masterCanvas: HTMLCanvasElement | null = null;
 
   constructor(container: HTMLElement) {
+    activePanoramicEngine = this;
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xf1f5f9); // Original sky background
@@ -948,7 +955,167 @@ export class PanoramicEngine {
     return this.renderer.domElement;
   }
 
+  /**
+   * Renders the full 360° equirectangular perspective grid (ground grid + horizon + vertical guides)
+   * into an offscreen 2D canvas with transparent alpha channel.
+   */
+  public renderEquirectangularGridToCanvas(width: number, height: number): HTMLCanvasElement {
+    const offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = width;
+    offscreenCanvas.height = height;
+
+    const rt = new THREE.WebGLRenderTarget(width, height, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+    });
+
+    const equirectScene = new THREE.Scene();
+    const equirectCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    const quadGeom = new THREE.PlaneGeometry(2, 2);
+
+    const vertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `;
+
+    const fragmentShader = `
+      precision highp float;
+      varying vec2 vUv;
+      uniform float eyeHeight;
+      uniform float gridSize;
+      uniform int gridType;
+      uniform vec3 gridColor;
+      uniform float gridOpacity;
+
+      void main() {
+        float u = vUv.x;
+        float v = vUv.y;
+        float phi = (1.0 - v) * 3.14159265359;
+        float theta = u * 2.0 * 3.14159265359;
+
+        vec3 dir = vec3(-cos(theta) * sin(phi), cos(phi), sin(theta) * sin(phi));
+
+        float totalAlpha = 0.0;
+
+        if (dir.y < -0.0001) {
+          float t = -eyeHeight / dir.y;
+          vec2 worldXZ = vec2(dir.x * t, dir.z * t);
+          vec2 p = worldXZ / gridSize;
+          float line = 0.0;
+
+          if (gridType == 1) {
+            mat2 rot60 = mat2(0.5, -0.866025, 0.866025, 0.5);
+            mat2 rot120 = mat2(-0.5, -0.866025, 0.866025, -0.5);
+            vec2 p2 = rot60 * p;
+            vec2 p3 = rot120 * p;
+            float d1 = abs(fract(p.y - 0.5) - 0.5) / fwidth(p.y);
+            float d2 = abs(fract(p2.y - 0.5) - 0.5) / fwidth(p2.y);
+            float d3 = abs(fract(p3.y - 0.5) - 0.5) / fwidth(p3.y);
+            line = max(max(1.0 - min(d1, 1.0), 1.0 - min(d2, 1.0)), 1.0 - min(d3, 1.0));
+          } else if (gridType == 2) {
+            float r = length(p);
+            float curvFactor = 1.0 / (1.0 + r * 0.02);
+            vec2 cp = p * curvFactor;
+            vec2 dCurv = abs(fract(cp - 0.5) - 0.5) / fwidth(cp);
+            line = 1.0 - min(min(dCurv.x, dCurv.y), 1.0);
+          } else if (gridType == 3) {
+            float depth = p.y;
+            float angle = atan(p.x, abs(p.y) + 0.1) / 3.14159265;
+            float dDepth = abs(fract(depth - 0.5) - 0.5) / fwidth(depth);
+            float dRay = abs(fract(angle * 16.0 - 0.5) - 0.5) / fwidth(angle * 16.0);
+            line = max(1.0 - min(dDepth, 1.0), 1.0 - min(dRay, 1.0));
+          } else if (gridType == 4) {
+            float ang1 = atan(p.y, p.x + 40.0) / 3.14159265;
+            float ang2 = atan(p.y, p.x - 40.0) / 3.14159265;
+            float l1 = 1.0 - min(abs(fract(ang1 * 24.0 - 0.5) - 0.5) / fwidth(ang1 * 24.0), 1.0);
+            float l2 = 1.0 - min(abs(fract(ang2 * 24.0 - 0.5) - 0.5) / fwidth(ang2 * 24.0), 1.0);
+            line = max(l1, l2);
+          } else if (gridType == 5) {
+            float r = length(p);
+            float thetaP = atan(p.y, p.x) / (2.0 * 3.14159265);
+            float ring = 1.0 - min(abs(fract(r - 0.5) - 0.5) / fwidth(r), 1.0);
+            float spoke = 1.0 - min(abs(fract(thetaP * 24.0 - 0.5) - 0.5) / fwidth(thetaP * 24.0), 1.0);
+            line = max(ring, spoke);
+          } else {
+            vec2 d = abs(fract(p - 0.5) - 0.5) / fwidth(p);
+            line = 1.0 - min(min(d.x, d.y), 1.0);
+          }
+
+          float distFade = clamp(1.0 - (t / 800.0), 0.0, 1.0);
+          totalAlpha = max(totalAlpha, line * gridOpacity * distFade);
+        }
+
+        float dHorizon = abs(v - 0.5) / fwidth(v);
+        float horizonLine = 1.0 - min(dHorizon, 1.0);
+        totalAlpha = max(totalAlpha, horizonLine * 0.8);
+
+        float dVert = abs(fract(u * 12.0 - 0.5) - 0.5) / fwidth(u * 12.0);
+        float vertLine = 1.0 - min(dVert, 1.0);
+        totalAlpha = max(totalAlpha, vertLine * 0.35);
+
+        gl_FragColor = vec4(gridColor, totalAlpha);
+      }
+    `;
+
+    const gSize = this.groundGridMaterial ? this.groundGridMaterial.uniforms.gridSize.value : Math.sqrt(this.eyeHeight / 1.5);
+    const gType = this.groundGridMaterial ? this.groundGridMaterial.uniforms.gridType.value : 0;
+    const gColor = this.groundGridMaterial ? this.groundGridMaterial.uniforms.gridColor.value : new THREE.Color(0x06b6d4);
+    const gOpacity = this.groundGridMaterial ? this.groundGridMaterial.uniforms.gridOpacity.value : 0.4;
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms: {
+        eyeHeight: { value: this.eyeHeight },
+        gridSize: { value: gSize },
+        gridType: { value: gType },
+        gridColor: { value: gColor },
+        gridOpacity: { value: gOpacity }
+      },
+      transparent: true
+    });
+
+    const mesh = new THREE.Mesh(quadGeom, mat);
+    equirectScene.add(mesh);
+
+    const prevRenderTarget = this.renderer.getRenderTarget();
+    this.renderer.setRenderTarget(rt);
+    this.renderer.clear();
+    this.renderer.render(equirectScene, equirectCamera);
+
+    const pixelBuffer = new Uint8Array(width * height * 4);
+    this.renderer.readRenderTargetPixels(rt, 0, 0, width, height, pixelBuffer);
+
+    this.renderer.setRenderTarget(prevRenderTarget);
+
+    const ctx = offscreenCanvas.getContext('2d')!;
+    const imgData = ctx.createImageData(width, height);
+    const rowBytes = width * 4;
+    for (let row = 0; row < height; row++) {
+      const srcRow = height - 1 - row;
+      const srcOffset = srcRow * rowBytes;
+      const dstOffset = row * rowBytes;
+      imgData.data.set(pixelBuffer.subarray(srcOffset, srcOffset + rowBytes), dstOffset);
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    rt.dispose();
+    quadGeom.dispose();
+    mat.dispose();
+
+    return offscreenCanvas;
+  }
+
   public dispose() {
+    if (activePanoramicEngine === this) {
+      activePanoramicEngine = null;
+    }
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
     }

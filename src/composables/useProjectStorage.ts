@@ -1,7 +1,9 @@
-import type { ProjectData, CanvasResolution } from '../types/painting';
+import { writePsd, readPsd, type Psd, type Layer as PsdLayer } from 'ag-psd';
+import type { ProjectData, CanvasResolution, SerializedLayer } from '../types/painting';
 import { useLayers } from './useLayers';
 import { useAppState } from './useAppState';
 import { usePainting } from './usePainting';
+import { getActivePanoramicEngine } from '../three/PanoramicEngine';
 
 const DB_NAME = 'gururi_paint_db';
 const STORE_NAME = 'projects';
@@ -22,8 +24,28 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 export function useProjectStorage() {
-  const { serializeLayers, loadLayersFromData, canvasWidth, canvasHeight, activeLayerId, activeLayer, masterCanvas, recomposeMaster } = useLayers();
-  const { eyeHeight, showGroundGrid, setEyeHeight, toggleGroundGrid, canvasResolution, setResolution, autoSaveEnabled, seamOffset } = useAppState();
+  const {
+    layers,
+    serializeLayers,
+    loadLayersFromData,
+    canvasWidth,
+    canvasHeight,
+    activeLayerId,
+    activeLayer,
+    masterCanvas,
+    recomposeMaster,
+    recomposeMasterImmediate
+  } = useLayers();
+  const {
+    eyeHeight,
+    showGroundGrid,
+    setEyeHeight,
+    toggleGroundGrid,
+    canvasResolution,
+    setResolution,
+    autoSaveEnabled,
+    seamOffset
+  } = useAppState();
   const { recentColors } = usePainting();
 
   function createProjectPayload(): ProjectData {
@@ -39,11 +61,126 @@ export function useProjectStorage() {
     };
   }
 
-  function exportPng(customFilename?: string) {
-    if (!masterCanvas) return;
+  // Helper to apply seamOffset wrapping to any 2D canvas
+  function shiftCanvas(srcCanvas: HTMLCanvasElement, width: number, height: number, offsetRatio: number): HTMLCanvasElement {
+    const splitX = Math.round(width * offsetRatio);
+    if (splitX === 0) return srcCanvas;
 
-    // 1. Recompose all active layers to ensure freshest state is exported
-    recomposeMaster();
+    const out = document.createElement('canvas');
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext('2d')!;
+
+    const part1Width = width - splitX;
+    // Right part moves to left
+    ctx.drawImage(srcCanvas, splitX, 0, part1Width, height, 0, 0, part1Width, height);
+    // Left part moves to right
+    ctx.drawImage(srcCanvas, 0, 0, splitX, height, part1Width, 0, splitX, height);
+    return out;
+  }
+
+  /**
+   * Export fully layered Photoshop Document (.psd) with transparent alpha channels
+   * If showGroundGrid is true, exports the perspective grid as a guide layer at the bottom.
+   */
+  function exportPsd(customFilename?: string) {
+    if (!masterCanvas) return;
+    recomposeMasterImmediate();
+
+    const width = canvasWidth.value;
+    const height = canvasHeight.value;
+    if (width === 0 || height === 0) return;
+
+    const offsetRatio = seamOffset.value || 0;
+
+    // Check if ground grid / malla should be included
+    const engine = getActivePanoramicEngine();
+    let gridCanvas: HTMLCanvasElement | null = null;
+    if (showGroundGrid.value && engine) {
+      gridCanvas = engine.renderEquirectangularGridToCanvas(width, height);
+    }
+
+    const psdChildren: PsdLayer[] = [];
+
+    // Add Malla / Grid as bottom guide layer if active
+    if (gridCanvas) {
+      const gridShifted = shiftCanvas(gridCanvas, width, height, offsetRatio);
+      psdChildren.push({
+        name: 'Malla Guía de Perspectiva 360°',
+        canvas: gridShifted,
+        opacity: 1,
+        hidden: false,
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+      });
+    }
+
+    // Add user drawing layers from bottom to top
+    layers.value.forEach((layer) => {
+      const layerCanvas = shiftCanvas(layer.canvas, width, height, offsetRatio);
+      psdChildren.push({
+        name: layer.name,
+        canvas: layerCanvas,
+        opacity: layer.opacity,
+        hidden: !layer.visible,
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+      });
+    });
+
+    let compositeCanvas: HTMLCanvasElement;
+    if (gridCanvas) {
+      const comp = document.createElement('canvas');
+      comp.width = width;
+      comp.height = height;
+      const cCtx = comp.getContext('2d')!;
+      const gridShifted = shiftCanvas(gridCanvas, width, height, offsetRatio);
+      cCtx.drawImage(gridShifted, 0, 0, width, height);
+      const masterShifted = shiftCanvas(masterCanvas, width, height, offsetRatio);
+      cCtx.drawImage(masterShifted, 0, 0, width, height);
+      compositeCanvas = comp;
+    } else {
+      compositeCanvas = shiftCanvas(masterCanvas, width, height, offsetRatio);
+    }
+
+    const psd: Psd = {
+      width,
+      height,
+      channels: 4, // RGBA
+      bitsPerChannel: 8,
+      colorMode: 3, // RGB
+      children: psdChildren,
+      canvas: compositeCanvas,
+    };
+
+    const buffer = writePsd(psd, { generateThumbnail: true });
+    const blob = new Blob([buffer], { type: 'image/vnd.adobe.photoshop' });
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const filename = customFilename || `craftsman_360_${dateStr}.psd`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.endsWith('.psd') ? filename : `${filename}.psd`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Export flattened PNG (with white background or pure transparency)
+   * If showGroundGrid is true, draws the perspective grid beneath the painting strokes.
+   */
+  function exportPng(customFilename?: string, includeWhiteBg: boolean = true) {
+    if (!masterCanvas) return;
+    recomposeMasterImmediate();
 
     const width = masterCanvas.width;
     const height = masterCanvas.height;
@@ -51,31 +188,30 @@ export function useProjectStorage() {
 
     const offsetRatio = seamOffset.value || 0;
 
-    // 2. Create export canvas with white background
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = width;
     exportCanvas.height = height;
     const ctx = exportCanvas.getContext('2d')!;
 
-    // Solid white base (equirectangular 360 panorama standard)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
-
-    // 3. Draw shifted master canvas according to seam offset
-    const splitX = Math.round(width * offsetRatio);
-    if (splitX === 0) {
-      ctx.drawImage(masterCanvas, 0, 0, width, height);
-    } else {
-      const part1Width = width - splitX;
-      // Right part moves to left
-      ctx.drawImage(masterCanvas, splitX, 0, part1Width, height, 0, 0, part1Width, height);
-      // Left part moves to right
-      ctx.drawImage(masterCanvas, 0, 0, splitX, height, part1Width, 0, splitX, height);
+    if (includeWhiteBg) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
     }
 
+    // Draw Malla / Grid if active
+    const engine = getActivePanoramicEngine();
+    if (showGroundGrid.value && engine) {
+      const gridCanvas = engine.renderEquirectangularGridToCanvas(width, height);
+      const gridShifted = shiftCanvas(gridCanvas, width, height, offsetRatio);
+      ctx.drawImage(gridShifted, 0, 0, width, height);
+    }
+
+    const shifted = shiftCanvas(masterCanvas, width, height, offsetRatio);
+    ctx.drawImage(shifted, 0, 0, width, height);
+
     const now = new Date();
-    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-    const filename = customFilename || `gururi_360_${dateStr}.png`;
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const filename = customFilename || `craftsman_360_${dateStr}.png`;
 
     exportCanvas.toBlob((blob) => {
       if (!blob) return;
@@ -90,29 +226,108 @@ export function useProjectStorage() {
     }, 'image/png');
   }
 
-  function saveProjectToFile(filename?: string) {
-    // Export directly as PNG for universal compatibility and instant re-use
-    exportPng(filename);
+  function exportPngTransparent(customFilename?: string) {
+    exportPng(customFilename, false);
   }
 
+  function saveProjectToFile(filename?: string) {
+    // Default quick export: Layered PSD
+    exportPsd(filename);
+  }
+
+  /**
+   * Load any supported project or illustration file:
+   * - Layered PSD (.psd)
+   * - Flat images (.png, .jpg, .webp, .bmp)
+   * - JSON / .gururi project data
+   */
   async function loadProjectFromFile(file: File): Promise<boolean> {
     try {
-      // 1. If image file (PNG, JPG, WebP), load directly onto active layer
-      if (file.type.startsWith('image/') || /\.(png|jpe?g|webp|bmp)$/i.test(file.name)) {
+      const fileNameLower = file.name.toLowerCase();
+
+      // 1. Layered Photoshop Document (.psd)
+      if (fileNameLower.endsWith('.psd') || file.type === 'image/vnd.adobe.photoshop') {
+        const buffer = await file.arrayBuffer();
+        const psd = readPsd(buffer, { skipThumbnail: true });
+
+        if (psd.width && psd.height) {
+          const res = psd.width >= 6000 ? 8192 : psd.width >= 3000 ? 4096 : 2048;
+          setResolution(res as CanvasResolution);
+        }
+
+        const width = canvasWidth.value;
+        const height = canvasHeight.value;
+
+        // If children layers exist
+        if (psd.children && psd.children.length > 0) {
+          const loadedLayers: SerializedLayer[] = [];
+          for (let i = 0; i < psd.children.length; i++) {
+            const child = psd.children[i];
+            if (child.canvas) {
+              const c = document.createElement('canvas');
+              c.width = width;
+              c.height = height;
+              const ctx = c.getContext('2d')!;
+
+              const left = child.left || 0;
+              const top = child.top || 0;
+              ctx.drawImage(child.canvas, left, top);
+
+              loadedLayers.push({
+                id: 'layer_' + Date.now() + '_' + i,
+                name: child.name || `Capa ${i + 1}`,
+                visible: !child.hidden,
+                opacity: typeof child.opacity === 'number' ? child.opacity : 1,
+                imageDataUrl: c.toDataURL('image/png'),
+              });
+            }
+          }
+
+          if (loadedLayers.length > 0) {
+            await loadLayersFromData(loadedLayers, width, height);
+            await saveToIndexedDB();
+            return true;
+          }
+        }
+
+        // If flattened composite canvas
+        if (psd.canvas) {
+          const c = document.createElement('canvas');
+          c.width = width;
+          c.height = height;
+          const ctx = c.getContext('2d')!;
+          ctx.drawImage(psd.canvas, 0, 0, width, height);
+
+          await loadLayersFromData([{
+            id: 'layer_' + Date.now(),
+            name: file.name.replace(/\.psd$/i, '') || 'Capa 1',
+            visible: true,
+            opacity: 1,
+            imageDataUrl: c.toDataURL('image/png'),
+          }], width, height);
+          await saveToIndexedDB();
+          return true;
+        }
+
+        throw new Error('No readable layers in PSD file');
+      }
+
+      // 2. Standard Flat Image (PNG, JPG, WebP)
+      if (file.type.startsWith('image/') || /\.(png|jpe?g|webp|bmp)$/i.test(fileNameLower)) {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => {
             const img = new Image();
             img.onload = () => {
               if (img.width > 0 && img.height > 0) {
-                const res = img.width >= 3000 ? 4096 : img.width >= 1500 ? 2048 : 1024;
+                const res = img.width >= 6000 ? 8192 : img.width >= 3000 ? 4096 : 2048;
                 setResolution(res as CanvasResolution);
               }
               const layer = activeLayer.value;
               if (layer) {
                 layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
                 layer.ctx.drawImage(img, 0, 0, layer.canvas.width, layer.canvas.height);
-                recomposeMaster();
+                recomposeMasterImmediate();
                 saveToIndexedDB();
                 resolve(true);
               } else {
@@ -127,7 +342,7 @@ export function useProjectStorage() {
         });
       }
 
-      // 2. If JSON / .gururi project file
+      // 3. JSON / .gururi project file
       const text = await file.text();
       const data: ProjectData = JSON.parse(text);
 
@@ -143,8 +358,6 @@ export function useProjectStorage() {
       if (typeof data.groundGrid === 'boolean') toggleGroundGrid(data.groundGrid);
 
       await loadLayersFromData(data.layers, width, height);
-
-      // Auto save after load
       await saveToIndexedDB();
       return true;
     } catch (err) {
@@ -158,7 +371,6 @@ export function useProjectStorage() {
 
     try {
       const db = await openDB();
-      // Ensure pure plain serializable object without Vue reactive Proxies
       const project = JSON.parse(JSON.stringify(createProjectPayload()));
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
@@ -198,9 +410,11 @@ export function useProjectStorage() {
   }
 
   return {
+    exportPsd,
+    exportPng,
+    exportPngTransparent,
     saveProjectToFile,
     loadProjectFromFile,
-    exportPng,
     saveToIndexedDB,
     loadFromIndexedDB
   };

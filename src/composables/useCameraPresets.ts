@@ -13,6 +13,7 @@ export interface CameraBookmark {
   label: string;
   preset: AxonometricPreset;
   orientation: CameraOrientation;
+  eyeHeight?: number;
 }
 
 // Valores canónicos estándar en grados (vista en picado / desde arriba hacia el plano de suelo)
@@ -128,7 +129,7 @@ export function useCameraPresets() {
     }
   };
 
-  const saveBookmark = (slotId: number) => {
+  const saveBookmark = (slotId: number, currentEyeHeight?: number) => {
     const idx = bookmarks.value.findIndex(b => b.id === slotId);
     if (idx !== -1) {
       bookmarks.value[idx] = {
@@ -136,18 +137,22 @@ export function useCameraPresets() {
         label: `Slot ${slotId}`,
         preset: currentPreset.value,
         orientation: { ...orientation },
+        eyeHeight: currentEyeHeight,
       };
       persistBookmarks(bookmarks.value);
     }
   };
 
-  const loadBookmark = (slotId: number) => {
+  const loadBookmark = (slotId: number, onEyeHeightChange?: (height: number) => void) => {
     const bookmark = bookmarks.value.find(b => b.id === slotId);
     if (bookmark) {
       currentPreset.value = bookmark.preset;
       orientation.yaw = bookmark.orientation.yaw;
       orientation.pitch = bookmark.orientation.pitch;
       orientation.roll = bookmark.orientation.roll;
+      if (bookmark.eyeHeight !== undefined && onEyeHeightChange) {
+        onEyeHeightChange(bookmark.eyeHeight);
+      }
       orientationChangeListeners.forEach(cb => cb({ ...bookmark.orientation }, bookmark.preset, true));
     }
   };

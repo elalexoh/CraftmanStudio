@@ -4,11 +4,11 @@ import { useAppState } from '../composables/useAppState';
 import { useLayers } from '../composables/useLayers';
 import { useProjectStorage } from '../composables/useProjectStorage';
 import { useI18n } from '../composables/useI18n';
-import { X, Image as ImageIcon, Check } from 'lucide-vue-next';
+import { X, Image as ImageIcon, Check, Layers } from 'lucide-vue-next';
 
 const { isPreviewOpen, seamOffset, setSeamOffset } = useAppState();
 const { masterCanvas, recomposeMaster } = useLayers();
-const { exportPng } = useProjectStorage();
+const { exportPsd, exportPng, exportPngTransparent } = useProjectStorage();
 const { t } = useI18n();
 
 const previewCanvasRef = ref<HTMLCanvasElement | null>(null);
@@ -130,10 +130,20 @@ watch(isPreviewOpen, (open) => {
 
       <div class="panel-footer">
         <span class="hint">{{ t('dragToAdjustSeam') }}</span>
-        <button class="btn-export" @click="exportPng()">
-          <ImageIcon :size="15" />
-          <span>{{ t('savePng') }}</span>
-        </button>
+        <div class="export-buttons-group">
+          <button class="btn-export btn-export-psd" :title="t('exportPsd')" @click="exportPsd()">
+            <Layers :size="15" />
+            <span>PSD (Capas)</span>
+          </button>
+          <button class="btn-export btn-export-trans" :title="t('exportPngTrans')" @click="exportPngTransparent()">
+            <ImageIcon :size="15" />
+            <span>PNG Transp.</span>
+          </button>
+          <button class="btn-export btn-export-white" :title="t('exportPngWhite')" @click="exportPng()">
+            <ImageIcon :size="15" />
+            <span>{{ t('savePng') }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -233,22 +243,47 @@ watch(isPreviewOpen, (open) => {
     color: #cbd5e1;
   }
 
+  .export-buttons-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   .btn-export {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: #2563eb;
+    background: #334155;
     color: #ffffff;
-    border: none;
+    border: 1px solid #475569;
     border-radius: 6px;
-    padding: 6px 14px;
+    padding: 6px 12px;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: all 0.15s;
 
     &:hover {
-      background: #1d4ed8;
+      background: #475569;
+    }
+
+    &.btn-export-psd {
+      background: #0284c7;
+      border-color: #0369a1;
+
+      &:hover {
+        background: #0369a1;
+      }
+    }
+
+    &.btn-export-white {
+      background: #2563eb;
+      border-color: #1d4ed8;
+
+      &:hover {
+        background: #1d4ed8;
+      }
     }
   }
 }
